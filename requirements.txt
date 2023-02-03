@@ -1,0 +1,15 @@
+albumentations
+scikit-learn
+torch-lr-finder
+torch-optimizer
+torch-ema @ git+https://github.com/fadel/pytorch_ema@27afe25b9fb9f0d05a87ae94e4e4ad9e92d70a85
+torch
+timm
+torchvision
+numpy
+pytorch-metric-learning
+matplotlib
+faiss-gpu
+tensorboard
+bokeh
+pandas

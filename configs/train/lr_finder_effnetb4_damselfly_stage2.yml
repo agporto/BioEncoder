@@ -1,0 +1,21 @@
+model:
+  backbone: timm_tf_efficientnet_b4
+  ckpt_pretrained: weights/effnetb4_damselfly_stage1/swa
+  num_classes: 4
+
+dataset: /home/agporto/Documents/swin_classification/morph_moritz_aligned/dataset/
+
+dataloaders:
+  train_batch_size: 70 # the higher - the better
+  valid_batch_size: 70
+  num_workers: 32 # set this to num of threads in your CPU
+
+optimizer:
+  name: SGD
+  params:
+    lr: 0.001
+
+criterion:
+  name: 'CrossEntropy'
+
+img_size: 384

@@ -1,0 +1,20 @@
+model:
+  backbone: timm_tf_efficientnet_b4
+  num_classes:
+  top_k_checkpoints: 2
+
+train:
+  amp: True # set this to True, if your GPU supports FP16. 2080Ti - okay, 1080Ti - not okay
+  weights_dir: weights/effnetb4_damselfly_stage1
+  stage: first
+
+dataset: /home/agporto/Documents/swin_classification/morph_moritz_aligned/dataset/
+
+dataloaders:
+  train_batch_size: 70 # the higher - the better
+  valid_batch_size: 70
+  num_workers: 32 # set this to num of threads in your CPU
+
+img_size: 384
+
+
