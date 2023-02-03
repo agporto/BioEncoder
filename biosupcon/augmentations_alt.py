@@ -1,5 +1,5 @@
-import albumentations as A
 import copy
+import albumentations as A
 from albumentations import pytorch as AT
 
 def get_transforms(config, key='transforms', norm=True, valid=False):

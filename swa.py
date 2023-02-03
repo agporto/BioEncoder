@@ -4,7 +4,7 @@ import torch
 import argparse
 import yaml
 
-from tools import utils
+from biosupcon import utils
 
 scaler = torch.cuda.amp.GradScaler()
 

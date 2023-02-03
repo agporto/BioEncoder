@@ -2,13 +2,13 @@ import argparse
 import logging
 import os
 import time
-import torch
 import yaml
 import shutil
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
+import torch
 
-from tools import utils
+from biosupcon import utils
 
 scaler = torch.cuda.amp.GradScaler()
 
@@ -18,7 +18,7 @@ def parse_config():
     parser.add_argument(
         "--config_name",
         type=str,
-        default="configs/train/train_supcon_resnet18_cifar10_stage2.yml",
+        default="configs/train/train_effnetb4_damselfly_stage1.yml",
     )
 
     parser_args = parser.parse_args()
