@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     if not amp: scaler = None
 
-    utils.seed_everything()
+    utils.set_seed()
 
     if os.path.exists(os.path.join(weights_dir, "swa")):
         os.remove(os.path.join(weights_dir, "swa"))

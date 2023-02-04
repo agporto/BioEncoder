@@ -1,11 +1,7 @@
 import torch
-import albumentations as A
-from albumentations import pytorch as AT
-from torch.utils.data import DataLoader
 import random
 import os
 import numpy as np
-import torch.backends.cudnn as cudnn
 from sklearn.metrics import f1_score
 
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
@@ -18,7 +14,7 @@ from .datasets import create_dataset
 from .augmentations import get_transforms
 
 
-def seed_everything(seed=42):
+def set_seed(seed=42):
     random.seed(seed)
     os.environ["PYHTONHASHSEED"] = str(seed)
     np.random.seed(seed)
@@ -44,43 +40,75 @@ class TwoCropTransform:
         return [self.crop_transform(image=x), self.crop_transform(image=x)]
 
 
-def build_transforms(config, second_stage):
+def build_transforms(config):
     train_transforms = get_transforms(config)
     valid_transforms = get_transforms(config, valid=True)
 
     return {
-        "train_transforms": train_transforms if not second_stage else valid_transforms,
+        "train_transforms": train_transforms,
         "valid_transforms": valid_transforms
     }
 
 
 def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=False):
 
-    train_features_dataset = create_dataset(data_dir=data_dir, train=True,
-                                               transform=transforms['train_transforms'], second_stage=True)
+    train_features_dataset = create_dataset(
+        data_dir=data_dir, 
+        train=True,
+        transform=transforms['train_transforms'], 
+        second_stage=True
+    )
 
-    valid_dataset = create_dataset(data_dir=data_dir, train=False,
-                                               transform=transforms['valid_transforms'], second_stage=True)
+    valid_dataset = create_dataset(
+        data_dir=data_dir, 
+        train=False,
+        transform=transforms['valid_transforms'], 
+        second_stage=True
+    )
 
-    train_features_loader = DataLoader(
-        train_features_dataset, batch_size=batch_sizes['train_batch_size'], shuffle=True,
-        num_workers=num_workers, pin_memory=True, drop_last=True)
+    train_features_loader = torch.utils.data.DataLoader(
+        train_features_dataset, 
+        batch_size=batch_sizes['train_batch_size'], 
+        shuffle=True,
+        num_workers=num_workers, 
+        pin_memory=True, 
+        drop_last=True
+    )
         
-    valid_loader = DataLoader(
-        valid_dataset, batch_size=batch_sizes['valid_batch_size'], shuffle=False,
-        num_workers=num_workers, pin_memory=True, drop_last=True)
+    valid_loader = torch.utils.data.DataLoader(
+        valid_dataset, 
+        batch_size=batch_sizes['valid_batch_size'], 
+        shuffle=False,
+        num_workers=num_workers, 
+        pin_memory=True, 
+        drop_last=True
+    )
+    
+    loaders = {
+        'train_features_loader': train_features_loader, 
+        'valid_loader': valid_loader
+    }
 
     if not second_stage:
-        train_supcon_dataset = create_dataset(data_dir=data_dir, train=True,
-                                               transform=TwoCropTransform(transforms['train_transforms']), second_stage=False)
-        train_supcon_loader = DataLoader(
-            train_supcon_dataset, batch_size=batch_sizes['train_batch_size'], shuffle=True,
-            num_workers=num_workers, pin_memory=True)
+        train_supcon_dataset = create_dataset(
+            data_dir=data_dir, 
+            train=True,
+            transform=TwoCropTransform(transforms['train_transforms']), 
+            second_stage=False
+        )
 
-        return {'train_supcon_loader': train_supcon_loader, 'train_features_loader': train_features_loader, 'valid_loader': valid_loader}
+        train_supcon_loader = torch.utils.data.DataLoader(
+            train_supcon_dataset, 
+            batch_size=batch_sizes['train_batch_size'], 
+            shuffle=True,
+            num_workers=num_workers, 
+            pin_memory=True
+        )
+
+        loaders['train_supcon_loader'] = train_supcon_loader
 
     else:
-        return {'train_features_loader': train_features_loader, 'valid_loader': valid_loader}
+        return loaders
     
 
 

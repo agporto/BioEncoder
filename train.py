@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     if not amp: scaler = None
 
-    utils.seed_everything()
+    utils.set_seed()
 
     # create model, loaders, optimizer, etc
     transforms = utils.build_transforms(hyperparams, second_stage=(stage == 'second'))
