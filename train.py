@@ -169,7 +169,7 @@ if __name__ == "__main__":
                 ),
             )
         # check if the best value of metric changed. If so -> save the model
-        if valid_metrics[target_metric]> metric_best: # > 0 if wanting to save all models
+        if valid_metrics[target_metric] > metric_best: # > 0 if wanting to save all models
             utils.add_to_logs(
                 logging,
                 "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(target_metric,
