@@ -107,12 +107,12 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
 
         loaders['train_supcon_loader'] = train_supcon_loader
 
-    else:
-        return loaders
+    return loaders
     
 
 
 def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=None):
+
     model = SupConModel(backbone=backbone, second_stage=second_stage, num_classes=num_classes)
 
     if ckpt_pretrained:
@@ -156,9 +156,36 @@ def compute_embeddings(loader, model, scaler):
             total_labels[idx * bsz: (idx + 1) * bsz] = labels.detach().numpy()
 
         del images, labels, embed
+
         torch.cuda.empty_cache()
 
+
     return np.float32(total_embeddings), total_labels.astype(int)
+
+#consider whether to use this function and what to do with batch sizes
+def compute_embeddings2(loader, model, scaler):
+    total_embeddings = None
+    total_labels = None
+
+    for images, labels in loader:
+        images = images.cuda()
+        if scaler:
+            with torch.cuda.amp.autocast():
+                embed = model(images)
+        else:
+            embed = model(images)
+        if total_embeddings is None:
+            total_embeddings = embed.detach().cpu()
+            total_labels = labels.detach().cpu()
+        else:
+            total_embeddings = torch.cat((total_embeddings, embed.detach().cpu()))
+            total_labels = torch.cat((total_labels, labels.detach().cpu()))
+
+        del images, labels, embed
+
+    torch.cuda.empty_cache()
+
+    return np.float32(total_embeddings), np.uint8(total_labels)
 
 
 def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, ema):
