@@ -37,4 +37,6 @@ augmentations:
               quality_lower: 45
               quality_upper: 99
         p: 0.5
+    - Flip:
+    - Rotate:
 

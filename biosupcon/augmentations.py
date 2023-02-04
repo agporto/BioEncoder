@@ -4,7 +4,7 @@ import albumentations as A
 from albumentations import pytorch as AT
 
 def get_transforms(config, key='transforms', norm=True, valid=False):
-    img_size = config['img_size'] if 'img_size' in config else 224
+    img_size = config.get('img_size', 224)
     aug = get_aug_from_config(config['augmentations'][key]) if key in config['augmentations'] else A.NoOp()
 
     return A.Compose([
@@ -22,10 +22,10 @@ def get_aug_from_config(config):
         return A.NoOp()
 
     if isinstance(config, str):
-        return name2factory(config)()
+        return getattr(A, config)()
 
     if isinstance(config, list):
-        return A.Compose([get_aug_from_config(c) for c in config])
+        return A.Sequential([get_aug_from_config(c) for c in config], p = 1.0)
 
     name = list(config.keys())[0]
     config = config[name] if config[name] else {}
@@ -33,16 +33,13 @@ def get_aug_from_config(config):
     args = config.pop("args", None)
     args = args if args is not None else []
 
-    if name == "Compose":
-        return A.Compose([get_aug_from_config(c) for c in args], **config)
+    if name == "Sequential":
+        return A.Sequential([get_aug_from_config(c) for c in args], **config)
     elif name == "OneOf":
         return A.OneOf([get_aug_from_config(c) for c in args], **config)
+    elif name == "OneOrOther":
+        return A.OneOrOther([get_aug_from_config(c) for c in args], **config)
+    elif name == "SomeOf":
+        return A.SomeOf([get_aug_from_config(c) for c in args], **config)
     else:
-        return name2factory(name)(*args, **config)
-
-
-def name2factory(name: str) -> A.BasicTransform:
-    try:
-        return getattr(A, name)
-    except AttributeError:
-        return getattr(A.pytorch, name)
+        return getattr(A, name)(*args, **config)
