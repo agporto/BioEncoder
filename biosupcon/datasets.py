@@ -22,13 +22,9 @@ class BioDataset(torchvision.datasets.ImageFolder):
         return image, label
 
 
-def create_supcon_dataset(data_dir, train, transform, second_stage):
-    if train:
-        path = os.path.join(data_dir, 'train')
-        return BioDataset(path, transform, second_stage)
-    else:
-        path = os.path.join(data_dir, 'val')
-        return BioDataset(path, transform, second_stage)
+def create_dataset(data_dir, train, transform, second_stage):
+    path = os.path.join(data_dir, 'train' if train else 'val')
+    return BioDataset(path, transform, second_stage)
 
 
 
