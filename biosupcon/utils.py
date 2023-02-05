@@ -162,7 +162,7 @@ def compute_embeddings(loader, model, scaler):
 
     return np.float32(total_embeddings), total_labels.astype(int)
 
-#consider whether to use this function and what to do with batch sizes
+#consider whether to use this function and what to do with batch
 def compute_embeddings2(loader, model, scaler):
     total_embeddings = None
     total_labels = None
@@ -193,8 +193,7 @@ def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, 
     train_loss = []
 
     for idx, (images, labels) in enumerate(train_loader):
-        images = torch.cat([images[0]['image'], images[1]['image']], dim=0)
-        images = images.cuda()
+        images = torch.cat([images[0]['image'], images[1]['image']], dim=0).cuda()
         labels = labels.cuda()
         bsz = labels.shape[0]
 
@@ -323,13 +322,47 @@ def validation_ce(model, criterion, valid_loader, scaler):
     metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
     return metrics
 
+def validation_ce2(model, criterion, valid_loader, scaler):
+    from sklearn.metrics import accuracy_score
+    model.eval()
+    val_loss = []
+    valid_bs = valid_loader.batch_size
+    y_pred, y_true = [], []
+
+    for data, target in valid_loader:
+        with torch.no_grad():
+            data, target = data.cuda(), target.cuda()
+            if scaler:
+                with torch.cuda.amp.autocast():
+                    output = model(data)
+            else:
+                output = model(data)
+
+            if criterion:
+                loss = criterion(output, target)
+                val_loss.append(loss.item())
+
+            pred = output.argmax(dim=1)
+            y_pred.extend(pred.cpu().numpy())
+            y_true.extend(target.cpu().numpy())
+
+            del data, target, output
+            torch.cuda.empty_cache()
+
+    valid_loss = np.mean(val_loss)
+    f1_scores = f1_score(y_true, y_pred, average=None)
+    f1_score_macro = f1_score(y_true, y_pred, average='macro')
+    accuracy_score = accuracy_score(y_true, y_pred)
+
+    metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
+    return metrics
+
 
 def copy_parameters_from_model(model):
-    copy_of_model_parameters = [p.clone().detach() for p in model.parameters() if p.requires_grad]
-    return copy_of_model_parameters
+    return [p.clone().detach() for p in model.parameters() if p.requires_grad]
 
 
-def copy_parameters_to_model(copy_of_model_parameters, model):
-    for s_param, param in zip(copy_of_model_parameters, model.parameters()):
+def copy_parameters_to_model(params, model):
+    for s_param, param in zip(params, model.parameters()):
         if param.requires_grad:
             param.data.copy_(s_param.data)
