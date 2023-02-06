@@ -326,7 +326,6 @@ def validation_ce2(model, criterion, valid_loader, scaler):
     from sklearn.metrics import accuracy_score
     model.eval()
     val_loss = []
-    valid_bs = valid_loader.batch_size
     y_pred, y_true = [], []
 
     for data, target in valid_loader:
