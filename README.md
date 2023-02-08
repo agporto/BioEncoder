@@ -1,17 +1,11 @@
 
 
-#BioSupCon
-<p align="center"><img src="https://github.com/ivanpanshin/SupCon-Framework/blob/main/images/logo.png?raw=true" width="800"></p>
+# BioSupCon
 
-
-The repo is an implementation of [Supervised Contrastive Learning](https://arxiv.org/abs/2004.11362). It's based on another [implementation](https://github.com/HobbitLong/SupContrast), but with several differencies: 
-- Fixed bugs (incorrect ResNet implementations, which leads to a very small max batch size), 
-- Offers a lot of additional functionality (first of all, rich validation). 
-
-To be more precise, in this implementations you will find:
+In this implementations you will find:
 - Augmentations with [albumentations](https://github.com/albumentations-team/albumentations)
-- Hyperparameters are moved to .yml configs
-- [t-SNE](https://github.com/DmitryUlyanov/Multicore-TSNE) visualizations
+- Hyperparameters (including augmentations) are moved to .yml configs
+- [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) and [PCA](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html) interactive plots using [bokeh](https://bokeh.org/)
 - 2-step validation (for features before and after the projection head) using metrics like AMI, NMI, mAP, precision_at_1, etc with [PyTorch Metric Learning](https://github.com/KevinMusgrave/pytorch-metric-learning).
 - [Exponential Moving Average](https://github.com/fadel/pytorch_ema) for a more stable training, and Stochastic Moving Average for a better generalization and just overall performance.
 - Automatic Mixed Precision (torch version) training in order to be able to train with a bigger batch size (roughly by a factor of 2).
