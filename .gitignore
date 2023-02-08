@@ -1,0 +1,6 @@
+logs/
+runs/
+weights/
+biosupcon/__pycache__/
+biosupcon/vis/__pycache__/
+

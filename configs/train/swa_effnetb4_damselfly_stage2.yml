@@ -8,11 +8,12 @@ train:
   weights_dir: weights/effnetb4_damselfly_stage2
   stage: second
 
-dataset: /home/agporto/Documents/swin_classification/morph_moritz_aligned/dataset/
+dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/dataset2/
+
 
 dataloaders:
   train_batch_size: 70 # the higher - the better
   valid_batch_size: 70
-  num_workers: 32 # set this to num of threads in your CPU
+  num_workers: 16 # set this to num of threads in your CPU
 
 img_size: 384

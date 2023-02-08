@@ -95,7 +95,10 @@ def embbedings_dimension_reductions(data_table):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, num_classes, out_path='plot.html'):
+def bokeh_plot(df, out_path='plot.html'):
+    if not all(col in df.columns for col in ['paths', 'class']):
+        raise ValueError("The dataframe must have columns 'paths' and 'class'")
+        
     tooltip = """
         <div>
             <div>
@@ -112,6 +115,7 @@ def bokeh_plot(df, num_classes, out_path='plot.html'):
               """
     filenames = df['paths']
     df['image_files'] = filenames
+    num_classes = len(df['class'].unique())
     cmap=plt.cm.get_cmap("jet", num_classes)
     colors_raw = cmap((df['class']), bytes=True)
     colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]

@@ -137,33 +137,33 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
     return {"criterion": criterion, "optimizer": optimizer, "scheduler": scheduler}
 
 
-def compute_embeddings(loader, model, scaler):
-    # note that it's okay to do len(loader) * bs, since drop_last=True is enabled
-    total_embeddings = np.zeros((len(loader)*loader.batch_size, model.embed_dim))
-    total_labels = np.zeros(len(loader)*loader.batch_size)
+# def compute_embeddings(loader, model, scaler):
+#     # note that it's okay to do len(loader) * bs, since drop_last=True is enabled
+#     total_embeddings = np.zeros((len(loader)*loader.batch_size, model.embed_dim))
+#     total_labels = np.zeros(len(loader)*loader.batch_size)
 
-    for idx, (images, labels) in enumerate(loader):
-        images = images.cuda()
-        bsz = labels.shape[0]
-        if scaler:
-            with torch.cuda.amp.autocast():
-                embed = model(images)
-                total_embeddings[idx * bsz: (idx + 1) * bsz] = embed.detach().cpu().numpy()
-                total_labels[idx * bsz: (idx + 1) * bsz] = labels.detach().numpy()
-        else:
-            embed = model(images)
-            total_embeddings[idx * bsz: (idx + 1) * bsz] = embed.detach().cpu().numpy()
-            total_labels[idx * bsz: (idx + 1) * bsz] = labels.detach().numpy()
+#     for idx, (images, labels) in enumerate(loader):
+#         images = images.cuda()
+#         bsz = labels.shape[0]
+#         if scaler:
+#             with torch.cuda.amp.autocast():
+#                 embed = model(images)
+#                 total_embeddings[idx * bsz: (idx + 1) * bsz] = embed.detach().cpu().numpy()
+#                 total_labels[idx * bsz: (idx + 1) * bsz] = labels.detach().numpy()
+#         else:
+#             embed = model(images)
+#             total_embeddings[idx * bsz: (idx + 1) * bsz] = embed.detach().cpu().numpy()
+#             total_labels[idx * bsz: (idx + 1) * bsz] = labels.detach().numpy()
 
-        del images, labels, embed
+#         del images, labels, embed
 
-        torch.cuda.empty_cache()
+#         torch.cuda.empty_cache()
 
 
-    return np.float32(total_embeddings), total_labels.astype(int)
+#     return np.float32(total_embeddings), total_labels.astype(int)
 
 #consider whether to use this function and what to do with batch
-def compute_embeddings2(loader, model, scaler):
+def compute_embeddings(loader, model, scaler):
     total_embeddings = None
     total_labels = None
 
@@ -282,47 +282,47 @@ def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
     return {"loss": np.mean(train_loss)}
 
 
+# def validation_ce(model, criterion, valid_loader, scaler):
+#     model.eval()
+#     val_loss = []
+#     valid_bs = valid_loader.batch_size
+#     # note that it's okay to do len(loader) * bs, since drop_last=True is enabled
+#     y_pred, y_true = np.zeros(len(valid_loader)*valid_bs), np.zeros(len(valid_loader)*valid_bs)
+#     correct_samples = 0
+
+#     for batch_i, (data, target) in enumerate(valid_loader):
+#         with torch.no_grad():
+#             data, target = data.cuda(), target.cuda()
+#             if scaler:
+#                 with torch.cuda.amp.autocast():
+#                     output = model(data)
+#                     if criterion:
+#                         loss = criterion(output, target)
+#                         val_loss.append(loss.item())
+#             else:
+#                 output = model(data)
+#                 if criterion:
+#                     loss = criterion(output, target)
+#                     val_loss.append(loss.item())
+
+#             correct_samples += (
+#                 target.detach().cpu().numpy() == np.argmax(output.detach().cpu().numpy(), axis=1)
+#             ).sum()
+#             y_pred[batch_i * valid_bs : (batch_i + 1) * valid_bs] = np.argmax(output.detach().cpu().numpy(), axis=1)
+#             y_true[batch_i * valid_bs : (batch_i + 1) * valid_bs] = target.detach().cpu().numpy()
+
+#             del data, target, output
+#             torch.cuda.empty_cache()
+
+#     valid_loss = np.mean(val_loss)
+#     f1_scores = f1_score(y_true, y_pred, average=None)
+#     f1_score_macro = f1_score(y_true, y_pred, average='macro')
+#     accuracy_score = correct_samples / (len(valid_loader)*valid_bs)
+
+#     metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
+#     return metrics
+
 def validation_ce(model, criterion, valid_loader, scaler):
-    model.eval()
-    val_loss = []
-    valid_bs = valid_loader.batch_size
-    # note that it's okay to do len(loader) * bs, since drop_last=True is enabled
-    y_pred, y_true = np.zeros(len(valid_loader)*valid_bs), np.zeros(len(valid_loader)*valid_bs)
-    correct_samples = 0
-
-    for batch_i, (data, target) in enumerate(valid_loader):
-        with torch.no_grad():
-            data, target = data.cuda(), target.cuda()
-            if scaler:
-                with torch.cuda.amp.autocast():
-                    output = model(data)
-                    if criterion:
-                        loss = criterion(output, target)
-                        val_loss.append(loss.item())
-            else:
-                output = model(data)
-                if criterion:
-                    loss = criterion(output, target)
-                    val_loss.append(loss.item())
-
-            correct_samples += (
-                target.detach().cpu().numpy() == np.argmax(output.detach().cpu().numpy(), axis=1)
-            ).sum()
-            y_pred[batch_i * valid_bs : (batch_i + 1) * valid_bs] = np.argmax(output.detach().cpu().numpy(), axis=1)
-            y_true[batch_i * valid_bs : (batch_i + 1) * valid_bs] = target.detach().cpu().numpy()
-
-            del data, target, output
-            torch.cuda.empty_cache()
-
-    valid_loss = np.mean(val_loss)
-    f1_scores = f1_score(y_true, y_pred, average=None)
-    f1_score_macro = f1_score(y_true, y_pred, average='macro')
-    accuracy_score = correct_samples / (len(valid_loader)*valid_bs)
-
-    metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
-    return metrics
-
-def validation_ce2(model, criterion, valid_loader, scaler):
     from sklearn.metrics import accuracy_score
     model.eval()
     val_loss = []

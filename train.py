@@ -61,7 +61,7 @@ if __name__ == "__main__":
     utils.set_seed()
 
     # create model, loaders, optimizer, etc
-    transforms = utils.build_transforms(hyperparams, second_stage=(stage == 'second'))
+    transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == 'second'))
     model = utils.build_model(backbone, second_stage=(stage == 'second'), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
 
