@@ -59,7 +59,7 @@ if __name__ == "__main__":
     if os.path.exists(os.path.join(weights_dir, "swa")):
         os.remove(os.path.join(weights_dir, "swa"))
 
-    transforms = utils.build_transforms(hyperparams, second_stage=True)
+    transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == 'second'))
     model = utils.build_model(backbone, second_stage=(stage == 'second'), num_classes=num_classes, ckpt_pretrained=None).cuda()
 

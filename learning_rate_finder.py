@@ -42,7 +42,7 @@ if __name__ == "__main__":
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
 
-    transforms = utils.build_transforms(hyperparams, second_stage=True)
+    transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=True)
     model = utils.build_model(backbone, second_stage=True, num_classes=num_classes,
                               ckpt_pretrained=ckpt_pretrained).cuda()

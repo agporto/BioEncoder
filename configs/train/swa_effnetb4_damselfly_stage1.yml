@@ -11,8 +11,8 @@ train:
 dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/dataset2/
 
 dataloaders:
-  train_batch_size: 70 # the higher - the better
-  valid_batch_size: 70
+  train_batch_size: 26 # the higher - the better
+  valid_batch_size: 26
   num_workers: 16 # set this to num of threads in your CPU
 
 img_size: 384

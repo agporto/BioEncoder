@@ -3,9 +3,12 @@ import copy
 import albumentations as A
 from albumentations import pytorch as AT
 
-def get_transforms(config, key='transforms', valid=False):
+def get_transforms(config, valid=False):
     img_size = config.get('img_size', 224)
-    aug = get_aug_from_config(config['augmentations'][key]) if key in config['augmentations'] else A.NoOp()
+    if 'augmentations' in config:
+        aug = get_aug_from_config(config['augmentations']['transforms'])
+    else:
+        aug = A.NoOp()
 
     return A.Compose([
         A.Resize(img_size, img_size, always_apply=True),
