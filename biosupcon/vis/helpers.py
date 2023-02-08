@@ -90,7 +90,7 @@ def embbedings_dimension_reductions(data_table):
     norm_data = (data_table - mean) / std
     pca_obj = decomposition.PCA(n_components=2)
     pca = pca_obj.fit_transform(norm_data)
-    tsne = manifold.TSNE().fit_transform(norm_data)
+    tsne = manifold.TSNE(learning_rate='auto', init='pca').fit_transform(norm_data)
     names = ['PC1', 'PC2', 'tSNE-0', 'tSNE-1']
     return np.hstack((pca, tsne)), names, pca_obj
 

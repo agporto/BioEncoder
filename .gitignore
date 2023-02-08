@@ -5,3 +5,5 @@ biosupcon/__pycache__/
 biosupcon/vis/__pycache__/
 .vscode/
 lr_finder_plots/
+plots/
+
