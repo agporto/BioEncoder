@@ -1,6 +1,6 @@
 
 
-# BioSupCon
+# BioSupCon: image classification and trait discovery for organismal biology
 
 <p align="center"><img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="800"></p>
 
