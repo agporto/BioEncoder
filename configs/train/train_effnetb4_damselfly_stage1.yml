@@ -12,12 +12,12 @@ train:
   target_metric: precision_at_1
   stage: first # first = Supcon, second = FC finetuning for classification
 
-dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/dataset2/
+dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
 
 
 dataloaders:
-  train_batch_size: 24 # the higher - the better
-  valid_batch_size: 24
+  train_batch_size: 40 # the higher - the better
+  valid_batch_size: 40
   num_workers: 16 # set this to num of threads in your CPU
 
 optimizer:
@@ -36,13 +36,13 @@ criterion:
   params:
     temperature: 0.1
 
-img_size: 384
+img_size: &size 256
 
 augmentations:
   transforms: 
     - RandomResizedCrop:
-        height: 384
-        width: 384
+        height: *size
+        width: *size 
         scale:  !!python/tuple [0.8,1]
     - Flip:
     - Rotate:
