@@ -4,7 +4,7 @@ model:
   num_classes: 4
 
 train:
-  n_epochs: 30
+  n_epochs: &epochs 30
   amp: True # set this to True, if your GPU supports FP16. 2080Ti - okay, 1080Ti - not okay
   ema: True # optional, but I recommend it, since the training might get unstable otherwise
   ema_decay_per_epoch: 0.4 # for middle/big datasets. Increase, if you have low amount of samples
@@ -27,8 +27,8 @@ optimizer:
 scheduler:
   name: CosineAnnealingLR
   params:
-    T_max: 20
-    eta_min: 0.001
+    T_max: *epochs
+    eta_min: 0.0001 # Make sure it is smaller than lr
 
 criterion:
   name: 'LabelSmoothing'
