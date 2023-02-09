@@ -2,7 +2,7 @@
 
 # BioSupCon
 
-<p align="center"><img src="https://github.com/agporto/BioSupCon/images/logo.png" width="800"></p>
+<p align="center"><img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="800"></p>
 
 
 This repository contains code for training, testing, and visualizing a BioSupCon model. BioSupCon is an approach for learning species trait data from images. It relies on image classification models trained using metric learning to generate robust traits (i.e., features). This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
