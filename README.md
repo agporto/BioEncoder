@@ -2,15 +2,17 @@
 
 # BioSupCon
 
-In this implementations you will find:
-- Augmentations with [albumentations](https://github.com/albumentations-team/albumentations)
-- Hyperparameters (including augmentations) are moved to .yml configs
-- [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) and [PCA](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html) interactive plots using [bokeh](https://bokeh.org/)
-- 2-step validation (for features before and after the projection head) using metrics like AMI, NMI, mAP, precision_at_1, etc with [PyTorch Metric Learning](https://github.com/KevinMusgrave/pytorch-metric-learning).
-- [Exponential Moving Average](https://github.com/fadel/pytorch_ema) for a more stable training, and Stochastic Moving Average for a better generalization and just overall performance.
-- Automatic Mixed Precision (torch version) training in order to be able to train with a bigger batch size (roughly by a factor of 2).
+This repository contains code for training, testing, and visualizing a BioSupCon model. BioSupCon is an approach for learning species trait data from images. It relies on image classification models trained using metric learning to generate robust traits (i.e., features). This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
+
+- Taxon-agnostic dataloaders (making it applicable to any dataset)
+- Rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391))
+- Custom augmentations techniques via [albumentations](https://github.com/albumentations-team/albumentations)
+- Hyperparameters (including augmentations) selection through .yml configs
+- Interactive [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) and [PCA](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html) plots using [Bokeh](https://bokeh.org/)
+- [Exponential Moving Average](https://github.com/fadel/pytorch_ema) for stable training, and Stochastic Moving Average for better generalization and performance.
+- Automatic Mixed Precision (torch version) training training for larger batch sizes. Please check if your graphics card supports it.
 - LabelSmoothing loss, and [LRFinder](https://github.com/davidtvs/pytorch-lr-finder) for the second stage of the training (FC).
-- TensorBoard logs, checkpoints
+- TensorBoard logs and checkpoints
 - Support of [timm models](https://github.com/rwightman/pytorch-image-models), and [pytorch-optimizer](https://github.com/jettify/pytorch-optimizer)
 
 
@@ -23,18 +25,69 @@ git clone https://github.com/agporto/BioSupCon && cd BioSupCon/
 
 2. Create a clean virtual environment 
 ```
-python3 -m venv venv
-source venv/bin/activate
+conda create -n biosup python=3.7
+conda activate biosup
 ```
 3. Install dependencies
 ````
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ````
+## Dataset
+
+Here are the steps to follow to make sure your data is ready to train `BioSupCon`:
+
+1 ) Organize your data using the following structure:
+```
+project/
+    root_directory/
+        class_1/
+            image_1.jpg
+            image_2.jpg
+            ...
+        class_2/
+            image_1.jpg
+            image_2.jpg
+            ...
+        ...
+```
+You can have as many subdirectories as you need, depending on the number of classes in your classification task. The key is to make sure that all images belonging to the same class are stored in the same subdirectory. Also, you do not need to worry about image resolution at this stage. The images will be resized during training using the parameters defined within the `YAML` configuration files. If a class contains and overwhelming percentage of images, please consider undersampling it.
+
+2) Split into train and validation 
+
+The `split_dataset.py` script is a command line tool that takes as input a path to a root directory containing subdirectories of images, and splits the data into `train` and `val` sets. The `val` set contains 10% of the images, but they are evenly distributed across classes. This is done to ensure that validation metrics will not be influenced by a dominant class. If a class does not contain enough images, that class is ignored (with a warning displayed). The remaining 90% of images go to the training set.
+
+To use split_dataset.py, simply run :
+
+```
+python split_dataset.py --dataset /path/to/root_directory
+
+```
+This will create the following directory structure under the project/ folder:
+
+```
+project/
+    root_directory/
+    biosup/
+        train/
+        val/
+```
+## Configuration
+
+`BioSupCon` relies on `YAML` files to control the training process. Each `YAML` file contains several hyperparameters that can be modified according to users needs. These hyperparameters include:
+
+- Model architecture
+- Augmentations
+- Loss functions
+- etc..
+
+Example config files can be found in the `configs/train` folder. These files provide a starting point for training biotasupcon models and can be modified to suit specific use cases.
+
 
 ## Training
 
-In order to execute `Damselfly` training run:
+To train the model, run the following commands:
+
 ```
 python train.py --config_name configs/train/train_effnetb4_damselfly_stage1.yml
 python swa.py --config_name configs/train/swa_effnetb4_damselfly_stage1.yml
@@ -53,11 +106,12 @@ tensorboard --logdir runs/effnetb4_damselfly_stage1
 ```
 ## Visualizations 
 
-This repo is supplied with [bokeh](https://bokeh.org/) PCA and T-SNE visualizations so that you can check embeddings you get after the training. To generate the bokeh plot, use:
+This repo is supplied with [interactive](https://bokeh.org/) PCA and T-SNE visualizations so that you can check the embeddings you get after the training. To generate the interactive plot, use:
 ```
 python interactive_plots.py --config_name configs/plots/plot_effnetb4_damselfly_stage1.yml
 ```
 
 ## Custom datasets
 
-It's fairly easy to adapt this pipeline to custom datasets. Simply change the information on the configuration files (e.g., number of classes and dataset directory).
+Simply change the information on the configuration files (e.g., number of classes and dataset directory).
+root_directory
