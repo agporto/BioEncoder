@@ -132,3 +132,4 @@ def bokeh_plot(df, out_path='plot.html'):
     tsne.circle('tSNE-0', 'tSNE-1', color='color', source=source)
     p = bplot.gridplot([[pca, tsne]])
     bplot.show(p)
+    return p
