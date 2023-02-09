@@ -40,7 +40,7 @@ Here are the steps to follow to make sure your data is ready to train `BioSupCon
 1 ) Organize your data using the following structure:
 ```
 project/
-    root_directory/
+    data_directory/
         class_1/
             image_1.jpg
             image_2.jpg
@@ -51,19 +51,19 @@ project/
             ...
         ...
 ```
-You can have as many subdirectories as you need, depending on the number of classes in your classification task. The key is to make sure that all images belonging to the same class are stored in the same subdirectory. Also, you do not need to worry about image resolution at this stage. The images will be resized during training using the parameters defined within the `YAML` configuration files. If a class contains and overwhelming percentage of images, please consider undersampling it.
+You can have as many subdirectories as you need, depending on the number of classes in your classification task. The key is to make sure that all images belonging to the same class are stored in the same subdirectory. Also, you do not need to worry about image resolution at this stage. The images will be resized during training using the parameters defined within the `YAML` configuration files. If a single class contains an overwhelming percentage of images, please consider undersampling it.
 
-2) Split into train and validation 
-
-The `split_dataset.py` script is a command line tool that takes as input a path to a root directory containing subdirectories of images, and splits the data into `train` and `val` sets. The `val` set contains 10% of the images, but they are evenly distributed across classes. This is done to ensure that validation metrics will not be influenced by a dominant class. If a class does not contain enough images, that class is ignored (with a warning displayed). The remaining 90% of images go to the training set.
-
-To use split_dataset.py, simply run :
+2 ) Split into train and val sets 
+ 
+To split the data into `train` and `val` sets, simply run :
 
 ```
-python split_dataset.py --dataset /path/to/root_directory
+python split_dataset.py --dataset /path/to/data_directory
 
 ```
-This will create the following directory structure under the project/ folder:
+The `split_dataset.py` script is a command line tool that takes as input a path to a root directory containing subdirectories of images, and splits the data into `train` and `val` sets. The `val` set contains 10% of the images, but they are evenly distributed across classes. This is done to ensure that validation metrics will not be influenced by the dominant classes. If a class does not contain enough images, that class is ignored (with a warning being displayed). The remaining 90% of images go to the `train` set.
+
+This will create the following directory structure under the `project/` folder:
 
 ```
 project/
@@ -81,7 +81,7 @@ project/
 - Loss functions
 - etc..
 
-Example config files can be found in the `configs/train` folder. These files provide a starting point for training biotasupcon models and can be modified to suit specific use cases.
+Example config files can be found in the `configs/train` folder. These files provide a starting point for training `BioSupCon` models and can be modified to suit specific use cases.
 
 
 ## Training
