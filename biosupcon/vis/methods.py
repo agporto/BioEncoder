@@ -165,8 +165,8 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
         Starting from a random initialization, generates an image that maximizes the score for a specific class using
         gradient ascent
     """
-    model.eval() # Should I remove this?
     model.to(device)
+    model.eval()
 
     noise = torch.randn([1, 3, noise_size, noise_size]).to(device)
     noise.requires_grad = True
@@ -179,10 +179,10 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
         p = F.softmax(outs[0], dim = 0)[target_class]
         
         if i % p_freq == 0 or i == epochs:        
-            print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p))
+            print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p.item()))
             
         if p > min_prob:
-            print('Reached {} confidence score in epoch {}. Stopping early.'.format(p, i))
+            print('Reached {} confidence score in epoch {}. Stopping early.'.format(p.item(), i))
             break
             
         obj = - outs[0][target_class]
@@ -191,7 +191,7 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
         scheduler.step()
     
     fig, axs = plt.subplots(1)
-    image = postprocess_image(noise)
+    image = postprocess_image(noise[0])
     axs.imshow(image)
     axs.set_xticks([])
     axs.set_yticks([])
