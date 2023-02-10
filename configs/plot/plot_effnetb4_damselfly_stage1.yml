@@ -1,0 +1,15 @@
+model:
+  backbone: timm_tf_efficientnet_b4
+  ckpt_pretrained: weights/effnetb4_damselfly_stage1/swa
+  num_classes:
+  stage: 'first'
+
+dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+
+dataloaders:
+  train_batch_size: 25 # Make sure your validation set is a multiple of this number
+  valid_batch_size: 25
+  num_workers: 16 
+
+img_size: 512
+

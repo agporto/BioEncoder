@@ -1,8 +1,7 @@
 logs/
 runs/
 weights/
-biosupcon/__pycache__/
-biosupcon/vis/__pycache__/
+__pycache__/
 .vscode/
 lr_finder_plots/
 plots/
