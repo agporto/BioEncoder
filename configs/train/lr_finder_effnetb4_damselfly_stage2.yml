@@ -1,5 +1,5 @@
 model:
-  backbone: timm_tf_efficientnet_b4
+  backbone: timm_tf_efficientnet_b0
   ckpt_pretrained: weights/effnetb4_damselfly_stage1/swa
   num_classes: 4
 
@@ -18,4 +18,4 @@ optimizer:
 criterion:
   name: 'CrossEntropy'
 
-img_size: 256
+img_size: 384

@@ -346,6 +346,51 @@ def grad_cam(model, module, img, target_layer = ["4"], target_category= None, de
     if save_path:
         fig1.savefig(save_path)
 
+def grad_cam(model, module, img, target_layer = ["4"], target_category= None, device = 'cuda', save_path = None):
+    for param in model.parameters():
+        param.requires_grad = True
+    use_cuda = True if device == 'cuda' else False
+        
+    contrast_cam = ContrastCam(model = model, feature_module = module,
+                    target_layer_names = target_layer, use_cuda = use_cuda)
+
+    img_t = preprocess_image(img).to(device)
+    
+    assert(target_category != None), "Please specify a target category"
+    grayscale_cam = contrast_cam(img_t, target_category)
+
+    grayscale_cam = cv2.resize(grayscale_cam, (img.shape[1], img.shape[0]))
+    cam = show_cam_on_image(img, grayscale_cam)
+
+    heatmap = cv2.applyColorMap(np.uint8(255 * grayscale_cam), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+
+    gb_model = GuidedBackpropReLUModel(model=model.encoder, use_cuda = use_cuda)
+    gb = gb_model(img_t, target_category=target_category)
+    gb = gb.transpose((1, 2, 0))
+
+    cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
+    cam_gb = deprocess_image(cam_mask*gb)
+    gb = deprocess_image(gb)
+
+    fig1 = plt.figure() # create a figure with the default size 
+
+    ax1 = fig1.add_subplot(1,3,1) 
+    ax1.imshow(cam[:,:,::-1], interpolation='none')
+    ax1.set_title('ContrastCam')
+
+    ax2 = fig1.add_subplot(1,3,2)
+    ax2.imshow(gb[:,:,::-1], interpolation='none')
+    ax2.set_title('Guided Backprop')
+
+    ax3 = fig1.add_subplot(1,3,3)
+    ax3.imshow(cam_gb[:,:,::-1], interpolation='none')
+    ax3.set_title('GradCam + Guided Backprop')
+
+    
+    if save_path:
+        fig1.savefig(save_path)
+
 def deep_dream(model, module, img, epochs, lr, step_size = 100, gamma = 0.6, device = 'cuda', save_path = None):
 
     """

@@ -1,5 +1,5 @@
 model:
-  backbone: timm_tf_efficientnet_b4
+  backbone: timm_tf_efficientnet_b0
   num_classes:
   top_k_checkpoints: 2
 
@@ -15,6 +15,6 @@ dataloaders:
   valid_batch_size: 40
   num_workers: 16 # set this to num of threads in your CPU
 
-img_size: 256
+img_size: 384
 
 

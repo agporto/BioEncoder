@@ -1,5 +1,5 @@
 model:
-  backbone: timm_tf_efficientnet_b4 #timm_tf_efficientnet_b0
+  backbone: timm_tf_efficientnet_b0 #timm_tf_efficientnet_b0
   ckpt_pretrained: 
   num_classes: # in the first stage of training we don't need num_classes, since we don't have a FC head
 
@@ -23,20 +23,20 @@ dataloaders:
 optimizer:
   name: SGD
   params:
-    lr: 0.01
+    lr: 0.003
 
 scheduler:
   name: CosineAnnealingLR
   params:
     T_max: *epochs
-    eta_min: 0.001 # Make sure it is smaller than lr
+    eta_min: 0.0003 # Make sure it is smaller than lr
 
 criterion:
   name: 'SupCon'
   params:
     temperature: 0.1
 
-img_size: &size 256
+img_size: &size 384
 
 augmentations:
   transforms: 
