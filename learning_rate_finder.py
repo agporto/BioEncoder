@@ -7,7 +7,6 @@ import yaml
 from torch_lr_finder import LRFinder
 
 
-
 def parse_config():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -30,7 +29,7 @@ if __name__ == "__main__":
     hyperparams = parse_config()
     backbone = hyperparams["model"]["backbone"]
     ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
-    num_classes = hyperparams['model']['num_classes']
+    num_classes = hyperparams["model"]["num_classes"]
     optimizer_params = hyperparams["optimizer"]
     scheduler_params = None
     criterion_params = hyperparams["criterion"]
@@ -38,16 +37,24 @@ if __name__ == "__main__":
     img_size = hyperparams["img_size"]
     batch_sizes = {
         "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
-        "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"]
+        "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
 
     transforms = utils.build_transforms(hyperparams)
-    loaders = utils.build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=True)
-    model = utils.build_model(backbone, second_stage=True, num_classes=num_classes,
-                              ckpt_pretrained=ckpt_pretrained).cuda()
+    loaders = utils.build_loaders(
+        data_dir, transforms, batch_sizes, num_workers, second_stage=True
+    )
+    model = utils.build_model(
+        backbone,
+        second_stage=True,
+        num_classes=num_classes,
+        ckpt_pretrained=ckpt_pretrained,
+    ).cuda()
 
-    optim = utils.build_optim(model, optimizer_params, scheduler_params, criterion_params)
+    optim = utils.build_optim(
+        model, optimizer_params, scheduler_params, criterion_params
+    )
     criterion, optimizer, scheduler = (
         optim["criterion"],
         optim["optimizer"],
@@ -58,12 +65,11 @@ if __name__ == "__main__":
     fig, ax = plt.subplots()
     lr_finder.plot(ax=ax)
 
-
     fig.savefig(
         "lr_finder_plots/supcon_{}_{}_bs_{}_stage_{}_lr_finder.png".format(
             optimizer_params["name"],
             data_dir.split("/")[-1],
             batch_sizes["train_batch_size"],
-            'second'
+            "second",
         )
     )
