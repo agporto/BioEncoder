@@ -346,7 +346,7 @@ def grad_cam(model, module, img, target_layer = ["4"], target_category= None, de
     if save_path:
         fig1.savefig(save_path)
 
-def grad_cam(model, module, img, target_layer = ["4"], target_category= None, device = 'cuda', save_path = None):
+def contrast_cam(model, module, img, target_layer = ["4"], target_category= None, device = 'cuda', save_path = None):
     for param in model.parameters():
         param.requires_grad = True
     use_cuda = True if device == 'cuda' else False
