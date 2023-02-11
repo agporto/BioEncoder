@@ -113,7 +113,7 @@ tensorboard --logdir runs/effnetb4_damselfly_stage1
 
 This repo is supplied with [interactive](https://bokeh.org/) PCA and T-SNE visualizations so that you can check the embeddings you get after the training. To generate the interactive plot, use:
 ```
-python interactive_plots.py --config_name configs/plots/plot_effnetb4_damselfly_stage1.yml
+python interactive_plots.py --config_name configs/plot/plot_effnetb4_damselfly_stage1.yml
 ```
 
 ## Custom datasets
