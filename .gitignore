@@ -5,3 +5,4 @@ __pycache__/
 .vscode/
 lr_finder_plots/
 plots/
+plot.html

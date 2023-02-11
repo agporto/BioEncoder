@@ -191,7 +191,7 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
         scheduler.step()
     
     fig, axs = plt.subplots(1)
-    image = postprocess_image(noise[0])
+    image = postprocess_image(noise)
     axs.imshow(image)
     axs.set_xticks([])
     axs.set_yticks([])
