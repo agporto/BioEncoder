@@ -139,6 +139,7 @@ def saliency_map(model, img, device = 'cuda', save_path = None):
     model.to(device)    
     img_t = preprocess_image(img).to(device)
     img_t.requires_grad = True
+    img_t.retain_grad() #added this line 
     
     out = model(img_t)
     max_out = out.max()
@@ -158,6 +159,49 @@ def saliency_map(model, img, device = 'cuda', save_path = None):
     if save_path:
         plt.savefig(save_path)
 
+# def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step_size = 100, gamma = 0.6,
+#                         noise_size = 224, p_freq = 50, device = 'cuda', save_path = None):
+    
+#     """
+#         Starting from a random initialization, generates an image that maximizes the score for a specific class using
+#         gradient ascent
+#     """
+#     model.to(device)
+#     model.eval()
+
+#     noise = torch.randn([1, 3, noise_size, noise_size]).to(device)
+#     noise.requires_grad = True
+#     opt = torch.optim.SGD([noise], lr = lr, weight_decay = weight_decay)
+#     scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size, gamma = gamma)
+    
+#     for i in range(1, epochs + 1):
+#         opt.zero_grad()
+#         outs = model(noise)
+#         p = F.softmax(outs[0], dim = 0)[target_class]
+        
+#         if i % p_freq == 0 or i == epochs:        
+#             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p.item()))
+            
+#         if p > min_prob:
+#             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p.item(), i))
+#             break
+            
+#         obj = - outs[0][target_class]
+#         obj.backward()
+#         opt.step()
+#         scheduler.step()
+    
+#     fig, axs = plt.subplots(1)
+#     image = postprocess_image(noise)
+#     axs.imshow(image)
+#     axs.set_xticks([])
+#     axs.set_yticks([])
+
+#     if save_path:
+#         fig.savefig(save_path)
+    
+#     return noise
+
 def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step_size = 100, gamma = 0.6,
                         noise_size = 224, p_freq = 50, device = 'cuda', save_path = None):
     
@@ -176,7 +220,7 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
     for i in range(1, epochs + 1):
         opt.zero_grad()
         outs = model(noise)
-        p = F.softmax(outs[0], dim = 0)[target_class]
+        p = F.softmax(outs, dim = 0)[target_class]
         
         if i % p_freq == 0 or i == epochs:        
             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p.item()))
@@ -185,7 +229,7 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p.item(), i))
             break
             
-        obj = - outs[0][target_class]
+        obj = - outs[target_class]
         obj.backward()
         opt.step()
         scheduler.step()
@@ -200,6 +244,48 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
         fig.savefig(save_path)
     
     return noise
+
+# def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, step_size = 100, gamma =0.8,   
+#                         p_freq = 50, device = 'cuda', save_path = None):
+    
+#     """
+#         Modifies a given image to have a high score for a specific class, similar to generate_image()
+#     """
+
+#     img_t = preprocess_image(img).to(device)
+#     img_t.requires_grad = True
+#     model = model.to(device)
+#     opt = torch.optim.SGD([img_t], lr = lr)
+#     scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size, gamma = gamma)
+    
+#     for i in range(1, epochs + 1):
+#         opt.zero_grad()
+#         outs = model(img_t)
+#         p = F.softmax(outs[0], dim = 0)[target_class]
+        
+#         if i % p_freq == 0 or i == epochs:        
+#             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p))
+            
+#         if p > min_prob:
+#             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p, i))
+#             break
+            
+#         obj = - outs[0][target_class]
+#         obj.backward()
+#         opt.step()
+#         scheduler.step()
+    
+#     fig, axs = plt.subplots(1)
+#     image = postprocess_image(img_t)
+    
+#     axs.imshow(image)
+#     axs.set_xticks([])
+#     axs.set_yticks([])
+
+#     if save_path:
+#         fig.savefig(save_path)
+    
+#     return img_t
 
 def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, step_size = 100, gamma =0.8,   
                         p_freq = 50, device = 'cuda', save_path = None):
@@ -217,7 +303,7 @@ def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, 
     for i in range(1, epochs + 1):
         opt.zero_grad()
         outs = model(img_t)
-        p = F.softmax(outs[0], dim = 0)[target_class]
+        p = F.softmax(outs, dim = 0)[target_class]
         
         if i % p_freq == 0 or i == epochs:        
             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p))
@@ -226,7 +312,7 @@ def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, 
             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p, i))
             break
             
-        obj = - outs[0][target_class]
+        obj = - outs[target_class]
         obj.backward()
         opt.step()
         scheduler.step()
@@ -345,6 +431,46 @@ def grad_cam(model, module, img, target_layer = ["4"], target_category= None, de
     
     if save_path:
         fig1.savefig(save_path)
+
+def grad_cam_new(model, module, img, class_id, rgb = True, device = 'cuda', alpha = 0.6, 
+                 figsize = (16, 16), save_path = None):
+    img_t = preprocess_image(img).to(device)
+    img_t.requires_grad = True #added this line 
+    img_t.retain_grad() #added this line 
+    acts = [0]
+    grads = [0]
+    
+    def f_hook(self, input, output):
+        acts[0] = output
+
+    def b_hook(self, grad_in, grad_out):
+        grads[0] = grad_out
+    
+    h1 = module.register_forward_hook(f_hook)
+    h2 = module.register_full_backward_hook(b_hook)
+    
+
+    model.to(device)
+    outs = model(img_t)
+    h1.remove()
+    h2.remove()
+    outs[class_id].backward()
+    
+    gap = torch.mean(grads[0][0].view(grads[0][0].size(0), grads[0][0].size(1), -1), dim = 2)
+    acts = acts[0][0]
+    gradcam = torch.nn.ReLU()(torch.sum(gap[0].reshape((gap.size()[1], 1, 1)) * acts, dim = 0))
+    arr = transforms.Resize((img.shape[1], img.shape[0]))(gradcam.unsqueeze(0))
+    gradcam_img = arr.detach().cpu().permute((1, 2, 0)).squeeze(-1)
+
+    fig, axs = plt.subplots(1, figsize = figsize)
+    
+    axs.imshow(np.asarray(img))
+    axs.imshow(gradcam_img, alpha = alpha)
+    axs.set_xticks([])
+    axs.set_yticks([])
+    
+    if save_path:
+        fig.savefig(save_path)
 
 def contrast_cam(model, module, img, target_layer = ["4"], target_category= None, device = 'cuda', save_path = None):
     for param in model.parameters():
