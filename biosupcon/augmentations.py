@@ -4,11 +4,19 @@ import albumentations as A
 from albumentations import pytorch as AT
 
 def get_transforms(config, valid=False):
-    img_size = config.get('img_size', 224)
-    if 'augmentations' in config:
-        aug = get_aug_from_config(config['augmentations']['transforms'])
-    else:
-        aug = A.NoOp()
+    """
+    Return a transformation pipeline based on the provided configuration.
+
+    Args:
+        config (dict): Dictionary containing the configuration for the image transformations.
+        valid (bool, optional): Indicates whether the transformation is for the validation set or not.
+    
+    Returns:
+        albumentations.core.composition.Compose: The image transformation pipeline.
+    """
+    default_size = 224
+    img_size = config.get('img_size', default_size)
+    aug = get_aug_from_config(config.get('augmentations', {}).get('transforms', []))
 
     return A.Compose([
         A.Resize(img_size, img_size, always_apply=True),
@@ -19,6 +27,15 @@ def get_transforms(config, valid=False):
 
 
 def get_aug_from_config(config):
+    """
+    A helper function to create image augmentation pipeline based on a given configuration.
+    
+    Parameters:
+        config (str, list, or dict): A string, list of strings, or dictionary representing the augmentation pipeline.
+    
+    Returns:
+        aug (albumentations.augmentations.transforms): The constructed augmentation pipeline.
+    """
     config = copy.deepcopy(config)
 
     if config is None:

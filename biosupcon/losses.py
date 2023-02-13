@@ -3,10 +3,27 @@ import torch
 
 
 class SupConLoss(nn.Module):
-    """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
-    It also supports the unsupervised contrastive loss in SimCLR"""
-    def __init__(self, temperature=0.07, contrast_mode='all',
-                 base_temperature=0.07):
+    """
+    Computes the Supervised Contrastive Loss as described in the paper
+    "Supervised Contrastive Learning" (https://arxiv.org/pdf/2004.11362.pdf)
+    and supports the unsupervised contrastive loss in SimCLR.
+
+    The contrastive loss encourages the embeddings to be close to their positive
+    samples and far away from negative samples. It measures the similarity between
+    two samples by the dot product of their embeddings and apply a temperature
+    scaling.
+
+    Args:
+        temperature (float, optional): The temperature scaling.Default: `0.07`.
+        contrast_mode (str, optional): Specifies the mode to compute contrastive loss.
+            There are two modes: `all` and `one`. In `all` mode, every sample is used
+            as an anchor. In `one` mode, only the first is used as an anchor.
+            Default: `'all'`.
+        base_temperature (float, optional): The base temperature used to normalize the
+            temperature. Default: `0.07`.
+    """
+
+    def __init__(self, temperature=0.07, contrast_mode="all", base_temperature=0.07):
         super(SupConLoss, self).__init__()
         self.temperature = temperature
         self.contrast_mode = contrast_mode
@@ -25,44 +42,44 @@ class SupConLoss(nn.Module):
         Returns:
             A loss scalar.
         """
-        device = (torch.device('cuda')
-                  if features.is_cuda
-                  else torch.device('cpu'))
+        device = torch.device("cuda") if features.is_cuda else torch.device("cpu")
 
         if len(features.shape) < 3:
-            raise ValueError('`features` needs to be [bsz, n_views, ...],'
-                             'at least 3 dimensions are required')
+            raise ValueError(
+                "`features` needs to be [bsz, n_views, ...],"
+                "at least 3 dimensions are required"
+            )
         if len(features.shape) > 3:
             features = features.view(features.shape[0], features.shape[1], -1)
 
         batch_size = features.shape[0]
         if labels is not None and mask is not None:
-            raise ValueError('Cannot define both `labels` and `mask`')
+            raise ValueError("Cannot define both `labels` and `mask`")
         elif labels is None and mask is None:
             mask = torch.eye(batch_size, dtype=torch.float32).to(device)
         elif labels is not None:
             labels = labels.contiguous().view(-1, 1)
             if labels.shape[0] != batch_size:
-                raise ValueError('Num of labels does not match num of features')
+                raise ValueError("Num of labels does not match num of features")
             mask = torch.eq(labels, labels.T).float().to(device)
         else:
             mask = mask.float().to(device)
 
         contrast_count = features.shape[1]
         contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)
-        if self.contrast_mode == 'one':
+        if self.contrast_mode == "one":
             anchor_feature = features[:, 0]
             anchor_count = 1
-        elif self.contrast_mode == 'all':
+        elif self.contrast_mode == "all":
             anchor_feature = contrast_feature
             anchor_count = contrast_count
         else:
-            raise ValueError('Unknown mode: {}'.format(self.contrast_mode))
+            raise ValueError("Unknown mode: {}".format(self.contrast_mode))
 
         # compute logits
         anchor_dot_contrast = torch.div(
-            torch.matmul(anchor_feature, contrast_feature.T),
-            self.temperature)
+            torch.matmul(anchor_feature, contrast_feature.T), self.temperature
+        )
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
         logits = anchor_dot_contrast - logits_max.detach()
@@ -74,7 +91,7 @@ class SupConLoss(nn.Module):
             torch.ones_like(mask),
             1,
             torch.arange(batch_size * anchor_count).view(-1, 1).to(device),
-            0
+            0,
         )
         mask = mask * logits_mask
 
@@ -86,13 +103,28 @@ class SupConLoss(nn.Module):
         mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
 
         # loss
-        loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
 
 
 class LabelSmoothingLoss(nn.Module):
+    """
+    Implements the Label Smoothing Loss for classification problems.
+
+    Args:
+    - classes (int): The number of classes in the classification problem.
+    - smoothing (float, optional): The smoothing factor for the target distribution. 
+        The default value is 0.
+    - dim (int, optional): The dimension along which the loss should be computed. 
+        The default value is -1.
+
+    Methods:
+    - forward(pred, target): Computes the label smoothing loss between `pred` 
+        and `target` tensors.
+
+    """
     def __init__(self, classes, smoothing=0, dim=-1):
         super(LabelSmoothingLoss, self).__init__()
         self.confidence = 1.0 - smoothing
@@ -100,16 +132,23 @@ class LabelSmoothingLoss(nn.Module):
         self.cls = classes
         self.dim = dim
 
-    def forward(self, pred, target):
+    def forward(self, pred:torch.Tensor, target:torch.Tensor):
+        if not isinstance(pred, torch.Tensor) or not isinstance(target, torch.Tensor):
+            raise TypeError("Inputs must be tensors")
+        if pred.shape[0] != target.shape[0]:
+            raise ValueError("Input tensors must have the same batch size")
+            
         pred = pred.log_softmax(dim=self.dim)
         with torch.no_grad():
-            # true_dist = pred.data.clone()
             true_dist = torch.zeros_like(pred)
             true_dist.fill_(self.smoothing / (self.cls - 1))
             true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
         return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
 
 
-LOSSES = {'SupCon': SupConLoss,
-          'LabelSmoothing': LabelSmoothingLoss,
-          'CrossEntropy': nn.CrossEntropyLoss}
+LOSSES = {
+    "SupCon": SupConLoss,
+    "LabelSmoothing": LabelSmoothingLoss,
+    "CrossEntropy": nn.CrossEntropyLoss,
+    "KLDiv": nn.KLDivLoss,
+}

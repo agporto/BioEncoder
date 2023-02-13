@@ -8,9 +8,19 @@ from torch.autograd import Function, Variable
 
 #plt.rcParams["figure.figsize"] = (20,20)
 
-class FeatureExtractor():
-    """ Class for extracting activations and
-    registering gradients from targetted intermediate layers """
+class FeatureExtractor:
+    """
+    Class for extracting activations and registering gradients from targeted intermediate layers of a model.
+    
+    Args:
+        model (nn.Module): The model from which the activations and gradients will be extracted.
+        target_layers (list): List of strings containing the names of the target layers in the model.
+    
+    Methods:
+        save_gradient(grad): Method to store the gradients of the target layers.
+        __call__(x): Call operator to extract the activations and gradients from the target layers.
+                      Returns the activations and the final output of the model.
+    """
 
     def __init__(self, model, target_layers):
         self.model = model
@@ -30,11 +40,22 @@ class FeatureExtractor():
                 outputs += [x]
         return outputs, x
 
-class ModelOutputs():
-    """ Class for making a forward pass, and getting:
-    1. The network output.
-    2. Activations from intermeddiate targetted layers.
-    3. Gradients from intermeddiate targetted layers. """
+class ModelOutputs:
+    """
+    Class for getting the network output, activations, and gradients 
+    from intermediate targetted layers after a forward pass.
+    
+    Args:
+        model (nn.Module): The model that will be used for the forward pass.
+        feature_module (nn.Module): The module that contains the target layers.
+        target_layers (list): List of strings containing the names of the target layers in the model.
+    
+    Methods:
+        get_gradients(): Method to return the gradients of the target layers.
+        __call__(x): Call operator to make a forward pass through the model and get the output, 
+                      activations, and gradients from the target layers. Returns the activations and output of 
+                      the model.
+    """
 
     def __init__(self, model, feature_module, target_layers):
         self.model = model
@@ -58,6 +79,16 @@ class ModelOutputs():
         return target_activations, x
 
 class GradCam:
+    """
+    Class for generating Grad-CAM visualizations for a given target layer in a given model.
+
+    Args:
+        model (nn.Module): The model to generate Grad-CAM visualizations for.
+        feature_module (nn.Module): The feature extraction module within the model to extract activations from.
+        target_layer_names (list of str): The names of the target layers to extract activations from.
+        use_cuda (bool): Flag indicating whether to use CUDA tensors or not.
+    
+    """
     def __init__(self, model, feature_module, target_layer_names, use_cuda):
         self.model = model
         self.feature_module = feature_module
@@ -111,8 +142,25 @@ class GradCam:
 
 
 class GuidedBackpropReLU(Function):
+    """
+    Class for implementing the GuidedBackpropReLU activation function in PyTorch.
+    This function is used for guided backpropagation in the network.
+
+    Attributes:
+        forward (staticmethod): the forward pass method.
+        backward (staticmethod): the backward pass method.
+    """
     @staticmethod
     def forward(self, input_img):
+        """
+        The forward pass method of the activation function.
+
+        Args:
+            input_img (torch.Tensor): input image tensor.
+
+        Returns:
+            torch.Tensor: the output tensor.
+        """
         positive_mask = (input_img > 0).type_as(input_img)
         output = torch.addcmul(torch.zeros(input_img.size()).type_as(input_img), input_img, positive_mask)
         self.save_for_backward(input_img, output)
@@ -120,6 +168,15 @@ class GuidedBackpropReLU(Function):
 
     @staticmethod
     def backward(self, grad_output):
+        """
+        The backward pass method of the activation function.
+
+        Args:
+            grad_output (torch.Tensor): the gradient tensor from the previous layer.
+
+        Returns:
+            torch.Tensor: the gradient tensor for the input.
+        """
         input_img, output = self.saved_tensors
         grad_input = None
 
@@ -132,6 +189,16 @@ class GuidedBackpropReLU(Function):
 
 
 class GuidedBackpropReLUModel:
+    """
+    A class that creates a model with GuidedBackpropReLU activation functions instead of standard ReLU activations.
+    This class replaces ReLU activations in a given model with GuidedBackpropReLU activations, making it easier to visualize
+    the importance of each neuron in the model's predictions.
+
+    Args:
+    model (nn.Module): The original model whose activations are to be replaced.
+    use_cuda (bool): A flag indicating whether to use GPU or not.
+    """
+
     def __init__(self, model, use_cuda):
         self.model = model
         self.model.eval()
@@ -177,6 +244,20 @@ class GuidedBackpropReLUModel:
         return output
 
 class ContrastCam:
+    """
+    ContrastCam - Implementation of a contrastive Grad-CAM for a given model and target layer.
+
+    Attributes:
+    model (torch.nn.Module): The model to be used.
+    feature_module (torch.nn.Module): The feature module used to extract activations from the target layer.
+    target_layer_names (list of str): A list of target layer names.
+    cuda (bool): A flag indicating whether CUDA should be used.
+
+    Methods:
+    forward (input_img): Passes an input image through the model.
+    call (input_img, target_category=None): Generates a contrastive Grad-CAM for a given input image and target category.
+
+    """
     def __init__(self, model, feature_module, target_layer_names, use_cuda):
         self.model = model
         self.feature_module = feature_module
@@ -189,6 +270,7 @@ class ContrastCam:
 
     def forward(self, input_img):
         return self.model(input_img)
+        
     def __call__(self, input_img, target_category=None):
         if self.cuda:
             input_img = input_img.cuda()

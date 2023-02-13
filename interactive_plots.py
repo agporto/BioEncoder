@@ -1,13 +1,15 @@
 import os
-from matplotlib import pyplot as plt
-import torch
-import torch.functional as F
-import biosupcon
-import albumentations as A
-import albumentations.pytorch as AT
-import pandas as pd
 import argparse
 import yaml
+import pandas as pd
+import torch
+import albumentations as A
+import albumentations.pytorch as AT
+import matplotlib.pyplot as plt
+import torch.functional as F
+
+# Importing the custom module biosupcon
+import biosupcon
 
 scaler = torch.cuda.amp.GradScaler()
 
