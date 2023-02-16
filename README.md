@@ -1,8 +1,7 @@
 
 
-# BioSupCon
+# BioEncode: A Framework for Image Classification and Trait Discovery in Organismal Biology
 
-## Image Classification and Trait Discovery for Organismal Biology
 
 <p align="center"><img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="800"></p>
 
