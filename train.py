@@ -64,29 +64,36 @@ if __name__ == "__main__":
     # create model, loaders, optimizer, etc
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(
-        data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second")
+        data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second"), is_supcon=(criterion_params["name"] == "SupCon"),
     )
     model = utils.build_model(
         backbone,
         second_stage=(stage == "second"),
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
-    ).cuda()
+    )
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        model = torch.nn.DataParallel(model)
+    
+    model = model.cuda()
 
+    optim = utils.build_optim(
+        model, optimizer_params, scheduler_params, criterion_params
+    )
+    criterion, optimizer, scheduler, loss_optimizer = (
+        optim["criterion"],
+        optim["optimizer"],
+        optim["scheduler"],
+        optim["loss_optimizer"],
+    )
     if ema:
         iters = len(loaders["train_features_loader"])
         ema_decay = ema_decay_per_epoch ** (1 / iters)
         ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
 
-    optim = utils.build_optim(
-        model, optimizer_params, scheduler_params, criterion_params
-    )
-    criterion, optimizer, scheduler = (
-        optim["criterion"],
-        optim["optimizer"],
-        optim["scheduler"],
-    )
-
+    if loss_optimizer is not None and stage == 'second':
+        raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
     # handle logging (regular logs, tensorboard, and weights)
     if logging_name is None:
         logging_name = "stage_{}_model_{}_dataset_{}".format(
@@ -120,7 +127,7 @@ if __name__ == "__main__":
         start_training_time = time.time()
         if stage == "first":
             train_metrics = utils.train_epoch_constructive(
-                loaders["train_supcon_loader"], model, criterion, optimizer, scaler, ema
+                loaders["train_supcon_loader"], model, criterion, optimizer, scaler, ema, loss_optimizer
             )
         else:
             train_metrics = utils.train_epoch_ce(
@@ -207,8 +214,8 @@ if __name__ == "__main__":
             )
         # check if the best value of metric changed. If so -> save the model
         if (
-            valid_metrics[target_metric] > metric_best
-        ):  # > 0 if wanting to save all models
+            valid_metrics[target_metric] > metric_best*0.99
+        ):  # > 0 if wanting to save all models 
             utils.add_to_logs(
                 logging,
                 "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(

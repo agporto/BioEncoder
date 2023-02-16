@@ -95,7 +95,7 @@ def build_transforms(config):
     }
 
 
-def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=False):
+def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=False, is_supcon=False):
     """
     Build data loaders for training and validation.
     
@@ -153,8 +153,8 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
         train_supcon_dataset = create_dataset(
             data_dir=data_dir, 
             train=True,
-            transform=TwoCropTransform(transforms['train_transforms']), 
-            second_stage=False
+            transform=TwoCropTransform(transforms['train_transforms']) if is_supcon else transforms['train_transforms'], 
+            second_stage=False if is_supcon else True
         )
 
         train_supcon_loader = torch.utils.data.DataLoader(
@@ -212,6 +212,11 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
         criterion = LOSSES[loss_params['name']](**loss_params['params'])
     else:
         criterion = LOSSES[loss_params['name']]()
+    
+    if 'optimizer' in loss_params:
+        loss_optimizer =  OPTIMIZERS[loss_params["optimizer"]["name"]](criterion.parameters(), **loss_params["optimizer"]["params"])
+    else:
+        loss_optimizer = None
 
     optimizer = OPTIMIZERS[optimizer_params["name"]](model.parameters(), **optimizer_params["params"])
 
@@ -220,7 +225,7 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
     else:
         scheduler = None
 
-    return {"criterion": criterion, "optimizer": optimizer, "scheduler": scheduler}
+    return {"criterion": criterion, "optimizer": optimizer, "scheduler": scheduler, "loss_optimizer": loss_optimizer}
 
 
 # def compute_embeddings(loader, model, scaler):
@@ -286,7 +291,7 @@ def compute_embeddings(loader, model, scaler):
     return np.float32(total_embeddings), np.uint8(total_labels)
 
 
-def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, ema):
+def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, ema, loss_optimizer):
     """
     Trains the `model` on the data from the `train_loader` for one epoch. The loss function is defined by `criterion` and
     the optimization algorithm is defined by `optimizer`. The training process can also be scaled using the `scaler` and
@@ -305,24 +310,31 @@ def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, 
     """
     model.train()
     train_loss = []
+    loss_optimization = False if loss_optimizer is None else True
 
     for idx, (images, labels) in enumerate(train_loader):
-        images = torch.cat([images[0]['image'], images[1]['image']], dim=0).cuda()
-        labels = labels.cuda()
-        bsz = labels.shape[0]
+        if loss_optimization:
+            images, labels = images.cuda(), labels.cuda()
+        else:
+            images = torch.cat([images[0]['image'], images[1]['image']], dim=0).cuda()
+            labels = labels.cuda()
+            bsz = labels.shape[0]
 
         if scaler:
             with torch.cuda.amp.autocast():
                 embed = model(images)
-                f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
-                embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+                if not loss_optimization:
+                    f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
+                    embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
                 loss = criterion(embed, labels)
 
         else:
             embed = model(images)
-            f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
-            embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+            if not loss_optimization:
+                f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
+                embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
             loss = criterion(embed, labels)
+
 
         del images, labels, embed
         torch.cuda.empty_cache()
@@ -330,13 +342,20 @@ def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, 
         train_loss.append(loss.item())
 
         optimizer.zero_grad()
+        if loss_optimization:
+            loss_optimizer.zero_grad()
+
         if scaler:
             scaler.scale(loss).backward()
             scaler.step(optimizer)
+            if loss_optimization:
+                scaler.step(loss_optimizer)
             scaler.update()
         else:
             loss.backward()
             optimizer.step()
+            if loss_optimization:
+                loss_optimizer.step()
 
         if ema:
             ema.update(model.parameters())
@@ -505,9 +524,9 @@ def validation_ce(model, criterion, valid_loader, scaler):
     valid_loss = np.mean(val_loss)
     f1_scores = f1_score(y_true, y_pred, average=None)
     f1_score_macro = f1_score(y_true, y_pred, average='macro')
-    accuracy_score = accuracy_score(y_true, y_pred)
+    acc_score = accuracy_score(y_true, y_pred)
 
-    metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
+    metrics = {"loss": valid_loss, "accuracy": acc_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
     return metrics
 
 

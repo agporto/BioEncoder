@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+from pytorch_metric_learning import losses
 
 
 class SupConLoss(nn.Module):
@@ -151,4 +152,6 @@ LOSSES = {
     "LabelSmoothing": LabelSmoothingLoss,
     "CrossEntropy": nn.CrossEntropyLoss,
     "KLDiv": nn.KLDivLoss,
+    'SubCenterArcFace': losses.SubCenterArcFaceLoss,
+    'ArcFace': losses.ArcFaceLoss,
 }

@@ -1,7 +1,7 @@
 model:
   backbone: timm_tf_efficientnet_b0
   num_classes: 4
-  top_k_checkpoints: 2
+  top_k_checkpoints: 3
 
 train:
   amp: True # set this to True, if your GPU supports FP16. 2080Ti - okay, 1080Ti - not okay
