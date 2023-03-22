@@ -1,0 +1,21 @@
+model:
+  backbone: timm_tf_efficientnet_b0
+  ckpt_pretrained: weights/effnetb4_damselfly_stage1_scArcFace/swa
+  num_classes: 4
+
+dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+
+dataloaders:
+  train_batch_size: 80 # the higher - the better
+  valid_batch_size: 80
+  num_workers: 16 # set this to num of threads in your CPU
+
+optimizer:
+  name: SGD
+  params:
+    lr: 0.001
+
+criterion:
+  name: 'CrossEntropy'
+
+img_size: 384

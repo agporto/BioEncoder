@@ -9,3 +9,5 @@ plot.html
 configs/plot/plot_effnetb4_damselfly_stage1_scArcFace.yml
 configs/train/swa_effnetb4_damselfly_stage1_scArcFace.yml
 configs/train/train_effnetb4_damselfly_stage1_scarcface.yml
+cosine.csv
+app.py

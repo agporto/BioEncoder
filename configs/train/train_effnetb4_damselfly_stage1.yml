@@ -12,7 +12,7 @@ train:
   target_metric: precision_at_1
   stage: first # first = Supcon, second = FC finetuning for classification
 
-dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/biosup/
 
 
 dataloaders:
@@ -36,13 +36,21 @@ criterion:
   params:
     temperature: 0.1
 
-img_size: &size 384
+img_size: &size 256
 
 augmentations:
   transforms: 
     - RandomResizedCrop:
         height: *size
         width: *size 
-        scale:  !!python/tuple [0.8,1]
+        scale:  !!python/tuple [0.7,1]
     - Flip:
-    - Rotate:
+    - RandomRotate90:
+    - MedianBlur:
+        blur_limit: 3
+        p: 0.3
+    - ShiftScaleRotate:
+        p: 0.4
+    - OpticalDistortion:
+    - GridDistortion:
+    - HueSaturationValue:

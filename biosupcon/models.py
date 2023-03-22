@@ -107,10 +107,10 @@ class SupConModel(nn.Module):
 
         """
         if self.second_stage:
-            feat = self.encoder(x).squeeze()
+            feat = self.encoder(x).view(x.size(0), -1)#.squeeze()
             return self.classifier(feat)
         else:
-            feat = self.encoder(x).squeeze()
+            feat = self.encoder(x).view(x.size(0), -1)#.squeeze()
             if self.projection_head:
                 return F.normalize(self.head(feat), dim=1)
             else:

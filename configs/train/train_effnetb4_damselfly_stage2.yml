@@ -12,7 +12,7 @@ train:
   target_metric: accuracy
   stage: second # first = Supcon, second = FC finetuning for classification
 
-dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/biosup/
 
 dataloaders:
   train_batch_size: 40 # the higher - the better
@@ -22,13 +22,13 @@ dataloaders:
 optimizer:
   name: SGD
   params:
-    lr: 9.40E-03
+    lr: 2.06E-02
 
 scheduler:
   name: CosineAnnealingLR
   params:
     T_max: *epochs
-    eta_min: 0.0001 # Make sure it is smaller than lr
+    eta_min: 0.002 # Make sure it is smaller than lr
 
 criterion:
   name: 'LabelSmoothing'
@@ -42,7 +42,15 @@ augmentations:
   transforms: 
     - RandomResizedCrop:
         height: *size
-        width: *size
-        scale:  !!python/tuple [0.8,1]
+        width: *size 
+        scale:  !!python/tuple [0.7,1]
     - Flip:
-    - Rotate:
+    - RandomRotate90:
+    - MedianBlur:
+        blur_limit: 3
+        p: 0.3
+    - ShiftScaleRotate:
+        p: 0.4
+    - OpticalDistortion:
+    - GridDistortion:
+    - HueSaturationValue:

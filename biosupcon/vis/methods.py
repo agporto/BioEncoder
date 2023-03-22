@@ -60,7 +60,7 @@ def visualize_activations(model, module, img, max_acts = 64, save_path = None, d
     handle = module.register_forward_hook(hook_fn)
     out = model(img_t)
     handle.remove()
-    acts = acts[0][0].cpu().detach().numpy()
+    acts = acts[0][0].cpu().detach().numpy()  # Subset the output for the first copy
     
     if acts.shape[0] > max_acts:
         acts = acts[torch.randperm(acts.shape[0])[:max_acts]]
@@ -78,55 +78,52 @@ def visualize_activations(model, module, img, max_acts = 64, save_path = None, d
     if save_path:
         fig.savefig(save_path)
 
-def maximally_activated_patches(model, img, patch_size = 448, stride = 100, 
-                                    device = 'cuda', save_path = None):
-
+def maximally_activated_patches(model, img, patch_size=448, stride=100, device='cuda', save_path=None):
     """
-        Plots the patches of an image that produce the highest activations
+    Plots the patches of an image that produce the highest activations
     """
-
     model.eval()
     model.to(device)
     mean = int(np.mean(np.asarray(img)))
     img_t = preprocess_image(img).to(device)
-    
+
     with torch.no_grad():
         out = model(img_t)
-        
-    probs = F.softmax(out[0], dim = 0)
+
+    probs = F.softmax(out[0], dim=0)
     max_index = probs.argmax()
     orig = probs[max_index]
-    
+
     dim1 = int(((img.shape[0] - patch_size) / stride) + 1)
     dim2 = int(((img.shape[1] - patch_size) / stride) + 1)
     diff = []
-    
+
     for i in range(dim1 * dim2):
         occluded = img.copy()
-        
+
         x0, y0, x1, y1 = gen_coords(i, patch_size, stride, dim1, dim2)
-        
+
         cv2.rectangle(occluded, (x0, y0), (x1, y1), (mean, mean, mean), -1)
 
         occluded_t = preprocess_image(occluded).to(device)
-        
+
         with torch.no_grad():
             out = model(occluded_t)
-            
-        occ_probs = F.softmax(out[0], dim = 0)
+
+        occ_probs = F.softmax(out[0], dim=0)
         diff.append(abs(orig - occ_probs[max_index].item()))
-    
-    diff = np.array(diff)
+
+    diff = np.array(diff.cpu())
     top_indices = diff.argsort()[-5:]
     fig, axs = plt.subplots(int(1), int(5))
-    
+
     for i, idx in enumerate(top_indices):
         image = img.copy()
-        x0, y0, x1, y1 = gen_coords(idx, patch_size, stride, dim1, dim2)        
+        x0, y0, x1, y1 = gen_coords(idx, patch_size, stride, dim1, dim2)
         axs[i].imshow(np.asarray(image[y0:y1, x0:x1]))
         axs[i].set_yticks([])
         axs[i].set_xticks([])
-    
+
     if save_path:
         fig.savefig(save_path)
 
@@ -142,7 +139,7 @@ def saliency_map(model, img, device = 'cuda', save_path = None):
     img_t.retain_grad() #added this line 
     
     out = model(img_t)
-    max_out = out.max()
+    max_out = out[0].max()
     max_out.backward()    
     saliency, _ = torch.max(img_t.grad.data.abs(), dim = 1)
     saliency = saliency.squeeze(0)
@@ -159,48 +156,6 @@ def saliency_map(model, img, device = 'cuda', save_path = None):
     if save_path:
         plt.savefig(save_path)
 
-# def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step_size = 100, gamma = 0.6,
-#                         noise_size = 224, p_freq = 50, device = 'cuda', save_path = None):
-    
-#     """
-#         Starting from a random initialization, generates an image that maximizes the score for a specific class using
-#         gradient ascent
-#     """
-#     model.to(device)
-#     model.eval()
-
-#     noise = torch.randn([1, 3, noise_size, noise_size]).to(device)
-#     noise.requires_grad = True
-#     opt = torch.optim.SGD([noise], lr = lr, weight_decay = weight_decay)
-#     scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size, gamma = gamma)
-    
-#     for i in range(1, epochs + 1):
-#         opt.zero_grad()
-#         outs = model(noise)
-#         p = F.softmax(outs[0], dim = 0)[target_class]
-        
-#         if i % p_freq == 0 or i == epochs:        
-#             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p.item()))
-            
-#         if p > min_prob:
-#             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p.item(), i))
-#             break
-            
-#         obj = - outs[0][target_class]
-#         obj.backward()
-#         opt.step()
-#         scheduler.step()
-    
-#     fig, axs = plt.subplots(1)
-#     image = postprocess_image(noise)
-#     axs.imshow(image)
-#     axs.set_xticks([])
-#     axs.set_yticks([])
-
-#     if save_path:
-#         fig.savefig(save_path)
-    
-#     return noise
 
 def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step_size = 100, gamma = 0.6,
                         noise_size = 224, p_freq = 50, device = 'cuda', save_path = None):
@@ -220,7 +175,7 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
     for i in range(1, epochs + 1):
         opt.zero_grad()
         outs = model(noise)
-        p = F.softmax(outs, dim = 0)[target_class]
+        p = F.softmax(outs[0], dim=0)[target_class]
         
         if i % p_freq == 0 or i == epochs:        
             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p.item()))
@@ -229,7 +184,7 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p.item(), i))
             break
             
-        obj = - outs[target_class]
+        obj = - outs[0][target_class]
         obj.backward()
         opt.step()
         scheduler.step()
@@ -244,48 +199,6 @@ def generate_image(model, target_class, epochs, min_prob, lr, weight_decay, step
         fig.savefig(save_path)
     
     return noise
-
-# def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, step_size = 100, gamma =0.8,   
-#                         p_freq = 50, device = 'cuda', save_path = None):
-    
-#     """
-#         Modifies a given image to have a high score for a specific class, similar to generate_image()
-#     """
-
-#     img_t = preprocess_image(img).to(device)
-#     img_t.requires_grad = True
-#     model = model.to(device)
-#     opt = torch.optim.SGD([img_t], lr = lr)
-#     scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size, gamma = gamma)
-    
-#     for i in range(1, epochs + 1):
-#         opt.zero_grad()
-#         outs = model(img_t)
-#         p = F.softmax(outs[0], dim = 0)[target_class]
-        
-#         if i % p_freq == 0 or i == epochs:        
-#             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p))
-            
-#         if p > min_prob:
-#             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p, i))
-#             break
-            
-#         obj = - outs[0][target_class]
-#         obj.backward()
-#         opt.step()
-#         scheduler.step()
-    
-#     fig, axs = plt.subplots(1)
-#     image = postprocess_image(img_t)
-    
-#     axs.imshow(image)
-#     axs.set_xticks([])
-#     axs.set_yticks([])
-
-#     if save_path:
-#         fig.savefig(save_path)
-    
-#     return img_t
 
 def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, step_size = 100, gamma =0.8,   
                         p_freq = 50, device = 'cuda', save_path = None):
@@ -303,7 +216,7 @@ def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, 
     for i in range(1, epochs + 1):
         opt.zero_grad()
         outs = model(img_t)
-        p = F.softmax(outs, dim = 0)[target_class]
+        p = F.softmax(outs[0], dim=0)[target_class]
         
         if i % p_freq == 0 or i == epochs:        
             print('Epoch: {} Confidence score for class {}: {}'.format(i, target_class, p))
@@ -312,7 +225,7 @@ def fool_model(model, img, target_class, epochs = 500, min_prob =0.9, lr = 0.5, 
             print('Reached {} confidence score in epoch {}. Stopping early.'.format(p, i))
             break
             
-        obj = - outs[target_class]
+        obj = - outs[0][target_class]
         obj.backward()
         opt.step()
         scheduler.step()
@@ -432,45 +345,6 @@ def grad_cam(model, module, img, target_layer = ["4"], target_category= None, de
     if save_path:
         fig1.savefig(save_path)
 
-def grad_cam_new(model, module, img, class_id, rgb = True, device = 'cuda', alpha = 0.6, 
-                 figsize = (16, 16), save_path = None):
-    img_t = preprocess_image(img).to(device)
-    img_t.requires_grad = True #added this line 
-    img_t.retain_grad() #added this line 
-    acts = [0]
-    grads = [0]
-    
-    def f_hook(self, input, output):
-        acts[0] = output
-
-    def b_hook(self, grad_in, grad_out):
-        grads[0] = grad_out
-    
-    h1 = module.register_forward_hook(f_hook)
-    h2 = module.register_full_backward_hook(b_hook)
-    
-
-    model.to(device)
-    outs = model(img_t)
-    h1.remove()
-    h2.remove()
-    outs[class_id].backward()
-    
-    gap = torch.mean(grads[0][0].view(grads[0][0].size(0), grads[0][0].size(1), -1), dim = 2)
-    acts = acts[0][0]
-    gradcam = torch.nn.ReLU()(torch.sum(gap[0].reshape((gap.size()[1], 1, 1)) * acts, dim = 0))
-    arr = transforms.Resize((img.shape[1], img.shape[0]))(gradcam.unsqueeze(0))
-    gradcam_img = arr.detach().cpu().permute((1, 2, 0)).squeeze(-1)
-
-    fig, axs = plt.subplots(1, figsize = figsize)
-    
-    axs.imshow(np.asarray(img))
-    axs.imshow(gradcam_img, alpha = alpha)
-    axs.set_xticks([])
-    axs.set_yticks([])
-    
-    if save_path:
-        fig.savefig(save_path)
 
 def contrast_cam(model, module, img, target_layer = ["4"], target_category= None, device = 'cuda', save_path = None):
     for param in model.parameters():
@@ -557,29 +431,3 @@ def deep_dream(model, module, img, epochs, lr, step_size = 100, gamma = 0.6, dev
         fig.savefig(save_path)
     
     return img_t
-
-def pfv(embeddings, image_shape=None, idx_layer=None, hierarchical=False, interpolation ='bilinear'):
-    """
-       Generates RGB visualization for the principal features of a certain batch of images
-    """
-
-    if image_shape is None: image_shape = embeddings[0].shape[-2:]
-    if idx_layer is None: idx_layer = len(embeddings)
-
-    with torch.no_grad():
-
-        layer_to_visualize = pca_decomposition(embeddings[idx_layer], 3)
-
-        if hierarchical:
-            for f in reversed(embeddings[:idx_layer]):
-                layer_to_visualize = F.interpolate(layer_to_visualize, size=(f.shape[2], f.shape[3]), mode=interpolation)
-                layer_to_visualize *= feature_map_normalization(f)
-        else:
-            amap = [F.interpolate(torch.sum(x,dim=1).unsqueeze(1), size=image_shape,mode=interpolation) for x in embeddings[:idx_layer]]
-            amap = torch.cat(amap, dim=1)
-            layer_to_visualize = F.interpolate(layer_to_visualize, size=image_shape,mode=interpolation) * torch.sum(amap,dim=1).unsqueeze(1)
-        
-        # Normalize response to RGB
-        layer_to_visualize = layer_to_visualize.detach().cpu().numpy()
-        rgb = normalize_and_scale_features(layer_to_visualize)
-        return rgb

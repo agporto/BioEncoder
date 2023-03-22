@@ -94,6 +94,7 @@ if __name__ == "__main__":
 
     if loss_optimizer is not None and stage == 'second':
         raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
+    
     # handle logging (regular logs, tensorboard, and weights)
     if logging_name is None:
         logging_name = "stage_{}_model_{}_dataset_{}".format(
