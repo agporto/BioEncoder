@@ -8,7 +8,7 @@ train:
   weights_dir: weights/effnetb4_damselfly_stage2_scArcFace
   stage: second
 
-dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/bioencoder/
 
 
 dataloaders:

@@ -3,7 +3,7 @@ model:
   ckpt_pretrained: weights/effnetb4_damselfly_stage1_scArcFace/swa
   num_classes: 4
 
-dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+dataset: /home/agporto/Dropbox/Year_2023/morph_moritz_aligned/bioencoder/
 
 dataloaders:
   train_batch_size: 80 # the higher - the better

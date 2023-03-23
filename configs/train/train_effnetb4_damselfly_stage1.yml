@@ -12,7 +12,7 @@ train:
   target_metric: precision_at_1
   stage: first # first = Supcon, second = FC finetuning for classification
 
-dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/bioencoder/
 
 
 dataloaders:

@@ -8,7 +8,7 @@ train:
   weights_dir: weights/effnetb4_damselfly_stage1
   stage: first
 
-dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/biosup/
+dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/bioencoder/
 
 dataloaders:
   train_batch_size: 40 # the higher - the better
