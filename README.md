@@ -1,7 +1,8 @@
 
 
+<p align="center"><img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="300"></p>
+
 # BioEncoder
-<p align="center"><img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="500"></p>
 
 ## Image Classification and Trait Discovery in Organismal Biology
 
