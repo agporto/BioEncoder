@@ -117,7 +117,7 @@ python interactive_plots.py --config_name configs/plot/plot_effnetb4_damselfly_s
 ```
 Similarly, we provide a model visualization playground, where individuals can get further insight into their data. To launch the app and explore the final classification model, simply use:
 ```
-streamlit run app.py -- --ckpt_pretrained ./weights/effnetb4_damselfly_stage2/swa --stage second --num_classes 4
+streamlit run model_explorer.py -- --ckpt_pretrained ./weights/effnetb4_damselfly_stage2/swa --stage second --num_classes 4
 ```
 Model visualization techniques vary between `first` and `second` stage, so please make sure you select the appropriate ones.
 
