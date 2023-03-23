@@ -1,10 +1,9 @@
-import torch
 import random
 import os
 import numpy as np
-from sklearn.metrics import f1_score, accuracy_score
-
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
+from sklearn.metrics import f1_score, accuracy_score
+import torch
 
 from .losses import LOSSES
 from .optimizers import OPTIMIZERS
