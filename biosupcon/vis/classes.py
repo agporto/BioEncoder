@@ -135,7 +135,7 @@ class GradCam:
             cam += w * target[i, :, :]
 
         cam = np.maximum(cam, 0)
-        cam = cv2.resize(cam, input_img.shape[2:])
+        cam = cv2.resize(cam, (input_img.shape[3], input_img.shape[2]))
         cam = cam - np.min(cam)
         cam = cam / np.max(cam)
         return cam
@@ -302,7 +302,7 @@ class ContrastCam:
             cam += w * target[i, :, :]
 
         cam = np.maximum(cam, 0)
-        cam = cv2.resize(cam, input_img.shape[2:])
+        cam = cv2.resize(cam, (input_img.shape[3], input_img.shape[2]))
         cam = cam - np.min(cam)
         cam = cam / np.max(cam)
         return cam

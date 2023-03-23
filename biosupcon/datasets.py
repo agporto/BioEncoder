@@ -52,5 +52,7 @@ def create_dataset(data_dir, train, transform, second_stage):
     Returns:
         BioDataset: Instance of the `BioDataset` class.
     """
+    # Set the path to the directory containing the images
     path = os.path.join(data_dir, "train" if train else "val")
+    # Return an instance of the `BioDataset` class
     return BioDataset(path, transform, second_stage)
