@@ -1,12 +1,15 @@
 
 
-<p align="center"><img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="300"></p>
+<p align="center">
+<img src="https://github.com/agporto/BioSupCon/blob/master/images/logo.png" width="300">
 
 # BioEncoder
 
+</p>
+
 ## Image Classification and Trait Discovery in Organismal Biology
 
-This repository contains code for training, testing, and visualizing a BioEncoder model. BioEncoder is a rich toolset for learning species trait data from images. It relies on image classification models trained using metric learning to generate robust traits (i.e., features). This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
+This repository contains code for training, testing, and visualizing a `BioEncoder` model. `BioEncoder` is a rich toolset for learning species trait data from images. It relies on image classification models trained using metric learning to generate robust traits (i.e., features). This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
 
 - Taxon-agnostic dataloaders (making it applicable to any biological dataset)
 - Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391))
