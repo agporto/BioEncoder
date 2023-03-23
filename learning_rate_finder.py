@@ -1,10 +1,13 @@
 import argparse
 import os
-from biosupcon import utils
-
-import matplotlib.pyplot as plt
 import yaml
+
+from bioencoder import utils
+import matplotlib.pyplot as plt
 from torch_lr_finder import LRFinder
+
+
+
 
 
 def parse_config():

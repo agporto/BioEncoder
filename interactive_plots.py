@@ -3,13 +3,10 @@ import argparse
 import yaml
 import pandas as pd
 import torch
-import albumentations as A
-import albumentations.pytorch as AT
-import matplotlib.pyplot as plt
-import torch.functional as F
 
-# Importing the custom module biosupcon
-import biosupcon
+
+# Importing the custom module bioencoder
+import bioencoder
 
 scaler = torch.cuda.amp.GradScaler()
 
@@ -45,13 +42,13 @@ if __name__ == "__main__":
     num_workers = hyperparams["dataloaders"]["num_workers"]
     img_size = hyperparams["img_size"]
 
-    biosupcon.utils.set_seed()
+    bioencoder.utils.set_seed()
 
-    transforms = biosupcon.utils.build_transforms(hyperparams)
-    loaders = biosupcon.utils.build_loaders(
+    transforms = bioencoder.utils.build_transforms(hyperparams)
+    loaders = bioencoder.utils.build_loaders(
         data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second")
     )
-    model = biosupcon.utils.build_model(
+    model = bioencoder.utils.build_model(
         backbone,
         second_stage=(stage == "second"),
         num_classes=num_classes,
@@ -60,11 +57,11 @@ if __name__ == "__main__":
     model.use_projection_head(False)
     model.eval()
 
-    embeddings_train, labels_train = biosupcon.utils.compute_embeddings(
+    embeddings_train, labels_train = bioencoder.utils.compute_embeddings(
         loaders["valid_loader"], model, scaler
     )
     paths_train = [item[0] for item in loaders["valid_loader"].dataset.imgs]
-    reduced_data, colnames, _ = biosupcon.vis.embbedings_dimension_reductions(
+    reduced_data, colnames, _ = bioencoder.vis.embbedings_dimension_reductions(
         embeddings_train
     )
 
@@ -75,4 +72,4 @@ if __name__ == "__main__":
         item[0].split("/")[-2] for item in loaders["valid_loader"].dataset.imgs
     ]
     os.makedirs("./plots", exist_ok=True)
-    biosupcon.vis.bokeh_plot(df, out_path=f"./plots/{basename}.html")
+    bioencoder.vis.bokeh_plot(df, out_path=f"./plots/{basename}.html")

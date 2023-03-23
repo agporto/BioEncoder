@@ -14,10 +14,10 @@ This repository contains code for training, testing, and visualizing a `BioEncod
 - Easy customization of hyperparameters, including augmentations, through `YAML` configs
 - Interactive [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) and [PCA](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html) plots using [BOKEH](https://bokeh.org/)
 - [Exponential Moving Average](https://github.com/fadel/pytorch_ema) for stable training, and Stochastic Moving Average for better generalization and performance.
-- Automatic Mixed Precision (torch version) training training for larger batch sizes. Please check if your graphics card supports it.
+- Automatic data parallelization for multi-gpu training and automatic mixed precision for larger batch sizes (support varies across graphics cards)
 - Access to state-of-the-art metric losses, such as [Supcon](https://arxiv.org/abs/2004.11362) and  [Sub-center ArcFace](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123560715.pdf).
 - [LRFinder](https://github.com/davidtvs/pytorch-lr-finder) for the second stage of the training (FC).
-- TensorBoard logs and checkpoints
+- TensorBoard logs and checkpoints (soon, Weights-and-Biases integration)
 - Support of [timm models](https://github.com/rwightman/pytorch-image-models), and [pytorch-optimizer](https://github.com/jettify/pytorch-optimizer)
 
 
@@ -73,7 +73,7 @@ This will create the following directory structure under the `project/` folder:
 ```
 project/
     root_directory/
-    biosup/
+    bioencoder/
         train/
         val/
 ```

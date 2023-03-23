@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
 import torch
 
-from biosupcon import utils
+from bioencoder import utils
 
 scaler = torch.cuda.amp.GradScaler()
 

@@ -4,14 +4,14 @@ from PIL import Image
 import argparse
 from streamlit_option_menu import option_menu
 
-import biosupcon as tools
+import bioencoder as biocode
 
 scaler = torch.cuda.amp.GradScaler()
 
 # Function to load the model
 @st.cache_resource
 def load_model(ckpt_pretrained, backbone, num_classes, stage):
-    model = tools.utils.build_model(backbone, second_stage=(stage == 'second'), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
+    model = biocode.utils.build_model(backbone, second_stage=(stage == 'second'), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
     model.use_projection_head((stage=='second'))
     model.eval()
     return model
@@ -48,7 +48,7 @@ def main(args):
             layers = [layer[0] for layer in model.named_parameters() if 'weight' in layer[0]]
             layer = st.selectbox("Select a layer", layers)
             max_filters = st.slider("Max filters", 5, 64, 25)
-            result = tools.vis.visualize_filters(model.encoder, layer, max_filters=max_filters)
+            result = biocode.vis.visualize_filters(model.encoder, layer, max_filters=max_filters)
             st.pyplot(result)
 
         elif selected == 'Activations':
@@ -56,11 +56,11 @@ def main(args):
             layer = st.selectbox("Select a layer", layers.keys())
             module = layers[layer]
             max_acts = st.slider("Max activations", 5, 64, 25)
-            result = tools.vis.visualize_activations(model, module, image, max_acts=max_acts)
+            result = biocode.vis.visualize_activations(model, module, image, max_acts=max_acts)
             st.pyplot(result)
 
         elif selected == 'Saliency':
-            result = tools.vis.saliency_map(model, image)
+            result = biocode.vis.saliency_map(model, image)
             st.pyplot(result)
 
         elif selected == 'GradCAM':
@@ -68,7 +68,7 @@ def main(args):
             layers =[name.split('.')[0] for name, module in model.encoder.named_modules() if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
             layer_set = sorted(set(layers))
             layer = st.selectbox("Select a layer", list(layer_set), index=len(list(layer_set))-1)
-            result = tools.vis.grad_cam(model, model.encoder,image,target_layer=[layer], target_category= None)
+            result = biocode.vis.grad_cam(model, model.encoder,image,target_layer=[layer], target_category= None)
             st.pyplot(result)
 
         elif selected == 'ConstrativeCAM':
@@ -76,7 +76,7 @@ def main(args):
             layer_set = sorted(set(layers))
             layer = st.selectbox("Select a layer", list(layer_set), index=len(list(layer_set))-1)
             target = st.selectbox("Select a target", list(range(args.num_classes)))
-            result = tools.vis.contrast_cam(model, model.encoder,image,target_layer=[layer], target_category= target)
+            result = biocode.vis.contrast_cam(model, model.encoder,image,target_layer=[layer], target_category= target)
             st.pyplot(result)
 
 if __name__ == '__main__':

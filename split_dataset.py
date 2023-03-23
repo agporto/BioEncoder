@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def split_data(root_dir, val_percent, max_ratio):
-    dataset_directory = os.path.join(Path(root_dir).parent, "biosup")
+    dataset_directory = os.path.join(Path(root_dir).parent, "bioencoder")
     if not os.path.exists(dataset_directory):
         os.makedirs(dataset_directory)
 
