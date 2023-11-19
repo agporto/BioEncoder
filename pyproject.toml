@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bioencoder"
+authors = [
+    {name = "Arthur Porto", email = "agporto@gmail.com"},
+]
+description = "A tool for imageomics"
+readme = "README.md"
+requires-python = "<=3.9"
+keywords = ["metric learning", "biology"]
+dynamic = ["dependencies"]
+version = "0.1.0"
+
+[project.urls]
+"Homepage" = "https://github.com/agporto/BioEncoder"
+"Bug Tracker" = "https://github.com/agporto/BioEncoder/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

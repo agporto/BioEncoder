@@ -2,14 +2,16 @@ albumentations==1.3.0
 scikit-learn==1.0.2
 torch-lr-finder
 torch-optimizer==0.3.0
-torch-ema @ git+https://github.com/fadel/pytorch_ema@27afe25b9fb9f0d05a87ae94e4e4ad9e92d70a85
+torch-ema
 torch #  1.13.1 choose the version that matches your cuda version
 timm==0.6.12
 torchvision # 0.14.1 choose the version that matches your cuda version
 numpy==1.21.6
 pytorch-metric-learning==2.0.1
 matplotlib==3.5.3
-faiss-gpu==1.7.2 # windows users might want to use faiss-cpu or another version
+# faiss-gpu==1.7.2 # windows users might want to use faiss-cpu or another version
 tensorboard
 bokeh==2.4.3
 pandas==1.3.5
+streamlit
+streamlit_option_menu

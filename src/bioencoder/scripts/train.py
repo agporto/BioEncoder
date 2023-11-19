@@ -10,29 +10,18 @@ import torch
 
 from bioencoder import utils
 
-scaler = torch.cuda.amp.GradScaler()
+def load_config(config_path):
 
-
-def parse_config():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config_name",
-        type=str,
-        default="configs/train/train_effnetb4_damselfly_stage1.yml",
-    )
-
-    parser_args = parser.parse_args()
-
-    with open(vars(parser_args)["config_name"], "r") as config_file:
-        hyperparams = yaml.full_load(config_file)
+    with open(config_path, "r") as file:
+        hyperparams = yaml.full_load(file)
 
     return hyperparams
 
-
-if __name__ == "__main__":
-    # parse hyperparameters
-    hyperparams = parse_config()
-    print(hyperparams)
+def train(
+    config_path=None,
+):
+    
+    hyperparams = load_config(config_path)
 
     backbone = hyperparams["model"]["backbone"]
     ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
@@ -55,6 +44,8 @@ if __name__ == "__main__":
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
+
+    scaler = torch.cuda.amp.GradScaler()
 
     if not amp:
         scaler = None
@@ -246,3 +237,17 @@ if __name__ == "__main__":
         scheduler.step()
 
     writer.close()
+
+
+if __name__ == "__main__":
+            
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_path",
+        type=str,
+        default=None,
+    )
+    args = parser.parse_args()
+
+    train(args.config_path)
+
