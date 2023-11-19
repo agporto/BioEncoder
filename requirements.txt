@@ -1,17 +1,13 @@
 albumentations==1.3.0
-scikit-learn==1.0.2
+scikit-learn
 torch-lr-finder
 torch-optimizer==0.3.0
-torch-ema
-torch #  1.13.1 choose the version that matches your cuda version
+torch-ema==0.3.0
 timm==0.6.12
-torchvision # 0.14.1 choose the version that matches your cuda version
-numpy==1.21.6
+numpy
 pytorch-metric-learning==2.0.1
-matplotlib==3.5.3
-# faiss-gpu==1.7.2 # windows users might want to use faiss-cpu or another version
+matplotlib
+faiss-cpu
 tensorboard
-bokeh==2.4.3
-pandas==1.3.5
-streamlit
-streamlit_option_menu
+bokeh
+pandas
