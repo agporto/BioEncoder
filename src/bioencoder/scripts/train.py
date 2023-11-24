@@ -72,7 +72,9 @@ def train(
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = torch.nn.DataParallel(model)
-        model = model.cuda()
+        
+    ## activate cuda
+    model = model.cuda()
 
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
@@ -151,11 +153,19 @@ def train(
             valid_metrics_projection_head = utils.validation_constructive(
                 loaders["valid_loader"], loaders["train_features_loader"], model, scaler
             )
-            model.use_projection_head(False)
+            
+            ## check for GPU parallelization
+            if model.__class__.__name__ == "DataParallel":
+                model_copy = model.module
+            else:
+                model_copy = model
+            
+            model_copy.use_projection_head(False)
             valid_metrics_encoder = utils.validation_constructive(
-                loaders["valid_loader"], loaders["train_features_loader"], model, scaler
+                loaders["valid_loader"], loaders["train_features_loader"], model_copy, scaler
             )
-            model.use_projection_head(True)
+            model_copy.use_projection_head(True)
+            
             print(
                 "epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\nvalid acc dict projection head {}\nvalid acc dict encoder {}".format(
                     epoch,
