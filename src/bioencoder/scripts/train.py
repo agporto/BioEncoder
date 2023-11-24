@@ -2,27 +2,24 @@ import argparse
 import logging
 import os
 import time
-import yaml
 import shutil
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
 import torch
 
 from bioencoder import utils
+from bioencoder import config
 
-def load_config(config_path):
 
-    with open(config_path, "r") as file:
-        hyperparams = yaml.full_load(file)
-
-    return hyperparams
 
 def train(
-    config_path=None,
+    config_path,
 ):
     
-    hyperparams = load_config(config_path)
+    ## load config
+    hyperparams = utils.load_config(config_path)
 
+    ## parse config
     backbone = hyperparams["model"]["backbone"]
     ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
     num_classes = hyperparams["model"]["num_classes"]
@@ -30,32 +27,39 @@ def train(
     ema = hyperparams["train"]["ema"]
     ema_decay_per_epoch = hyperparams["train"]["ema_decay_per_epoch"]
     n_epochs = hyperparams["train"]["n_epochs"]
-    logging_name = hyperparams["train"]["logging_name"]
     target_metric = hyperparams["train"]["target_metric"]
     stage = hyperparams["train"]["stage"]
-    data_dir = hyperparams["dataset"]
     optimizer_params = hyperparams["optimizer"]
     scheduler_params = hyperparams["scheduler"]
     criterion_params = hyperparams["criterion"]
-    img_params = hyperparams["img_size"]
-
     batch_sizes = {
         "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
+    
+    ## get parameters
+    root_dir = config.root_dir
+    run_name = config.run_name
 
+    ## set directories
+    data_dir = os.path.join(root_dir, "data", run_name)
+
+    ## scaler
     scaler = torch.cuda.amp.GradScaler()
-
     if not amp:
         scaler = None
-
     utils.set_seed()
 
     # create model, loaders, optimizer, etc
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(
-        data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second"), is_supcon=(criterion_params["name"] == "SupCon"),
+        data_dir, 
+        transforms, 
+        batch_sizes, 
+        num_workers, 
+        second_stage=(stage == "second"), 
+        is_supcon=(criterion_params["name"] == "SupCon"),
     )
     model = utils.build_model(
         backbone,
@@ -63,11 +67,12 @@ def train(
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
     )
+    
+    ## configure multi-GPU system
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = torch.nn.DataParallel(model)
-    
-    model = model.cuda()
+        model = model.cuda()
 
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
@@ -86,11 +91,16 @@ def train(
     if loss_optimizer is not None and stage == 'second':
         raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
     
+
+
     # handle logging (regular logs, tensorboard, and weights)
-    if logging_name is None:
-        logging_name = "stage_{}_model_{}_dataset_{}".format(
-            stage, backbone, data_dir.split("/")[-1]
+    if run_name is None:
+        logging_name = "stage_{}_model_{}".format(
+            stage, backbone
         )
+        print(f"WARNING: No run-name set - using {logging_name}!")
+    else:
+        logging_name = run_name
 
     shutil.rmtree("weights/{}".format(logging_name), ignore_errors=True)
     shutil.rmtree(
@@ -106,9 +116,9 @@ def train(
         exist_ok=True,
     )
 
-    writer = SummaryWriter("runs/{}".format(logging_name))
-    logging_dir = "logs/{}".format(logging_name)
-    logging_path = os.path.join(logging_dir, "train.log")
+    writer = SummaryWriter("runs", filename_suffix=logging_name)
+    logging_dir = "logs"
+    logging_path = os.path.join(logging_dir, f"{logging_name}.log")
     logging.basicConfig(filename=logging_path, level=logging.INFO, filemode="w+")
 
     # epoch loop

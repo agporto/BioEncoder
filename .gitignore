@@ -12,3 +12,21 @@ configs/train/train_effnetb4_damselfly_stage1_scarcface.yml
 cosine.csv
 app.py
 biosupcon/vis/methods_backup.py
+
+## python stuff
+bin
+docs
+develop-eggs
+dist
+eggs
+htmlcov
+lib
+lib64
+local
+parts
+phenopype.egg-info
+spyder-debug.log
+src/*.egg-info
+node_modules
+package-lock.json
+package.json

@@ -5,63 +5,42 @@ import argparse
 import yaml
 
 from bioencoder import utils
-
-scaler = torch.cuda.amp.GradScaler()
-
-
-def swa(paths):
-    state_dicts = []
-    for path in paths:
-        state_dicts.append(torch.load(path)["model_state_dict"])
-
-    average_dict = OrderedDict()
-    for k in state_dicts[0].keys():
-        average_dict[k] = sum([state_dict[k] for state_dict in state_dicts]) / len(
-            state_dicts
-        )
-
-    return average_dict
+from bioencoder import config
 
 
-def parse_config():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config_name",
-        type=str,
-        default="configs/train/swa_effnetb4_damselfly_stage2.yml",
-    )
-
-    parser_args = parser.parse_args()
-
-    with open(vars(parser_args)["config_name"], "r") as config_file:
-        hyperparams = yaml.full_load(config_file)
-
-    return hyperparams
-
-
-if __name__ == "__main__":
-    hyperparams = parse_config()
+def swa(
+    config_path, 
+):
+    
+    hyperparams = utils.load_config(config_path)
 
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"]["num_classes"]
     top_k_checkoints = hyperparams["model"]["top_k_checkpoints"]
     amp = hyperparams["train"]["amp"]
-    weights_dir = hyperparams["train"]["weights_dir"]
     stage = hyperparams["train"]["stage"]
-    data_dir = hyperparams["dataset"]
     batch_sizes = {
         "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-
-    if not amp:
-        scaler = None
-
-    utils.set_seed()
-
+    
+    
+    ## get parameters
+    root_dir = config.root_dir
+    run_name = config.run_name
+    
+    ## set directories
+    weights_dir = os.path.join(root_dir, "weights", run_name)
     if os.path.exists(os.path.join(weights_dir, "swa")):
         os.remove(os.path.join(weights_dir, "swa"))
+    data_dir = os.path.join(root_dir, "data", run_name)
+
+    ## scaler
+    scaler = torch.cuda.amp.GradScaler()
+    if not amp:
+        scaler = None
+    utils.set_seed()
 
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(
@@ -74,14 +53,23 @@ if __name__ == "__main__":
         ckpt_pretrained=None,
     ).cuda()
 
+    ## inspect epochs
     list_of_epochs = sorted([int(x.split("epoch")[1]) for x in os.listdir(weights_dir)])
     best_epochs = list_of_epochs[-top_k_checkoints::]
-    model_prefix = "epoch"
 
     checkpoints_paths = [
-        "{}/{}{}".format(weights_dir, model_prefix, epoch) for epoch in best_epochs
-    ]
-    average_dict = swa(checkpoints_paths)
+        "{}/{}{}".format(weights_dir, "epoch", epoch) for epoch in best_epochs
+    ]    
+    
+    state_dicts = []
+    for path in checkpoints_paths:
+        state_dicts.append(torch.load(path)["model_state_dict"])
+
+    average_dict = OrderedDict()
+    for k in state_dicts[0].keys():
+        average_dict[k] = sum([state_dict[k] for state_dict in state_dicts]) / len(
+            state_dicts
+        )
 
     torch.save({"model_state_dict": average_dict}, os.path.join(weights_dir, "swa"))
     model.load_state_dict(
@@ -98,3 +86,15 @@ if __name__ == "__main__":
         )
 
     print("swa stage {} validation metrics: {}".format(stage, valid_metrics))
+    
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_path",
+        type=str,
+        default=None,
+    )
+    args = parser.parse_args()
+
+    swa(args.config_path)

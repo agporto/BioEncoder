@@ -4,6 +4,7 @@ import numpy as np
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import f1_score, accuracy_score
 import torch
+import yaml
 
 from .losses import LOSSES
 from .optimizers import OPTIMIZERS
@@ -11,6 +12,14 @@ from .schedulers import SCHEDULERS
 from .models import SupConModel
 from .datasets import create_dataset
 from .augmentations import get_transforms
+
+
+def load_config(config_path):
+
+    with open(config_path, "r") as file:
+        params = yaml.full_load(file)
+
+    return params
 
 
 def set_seed(seed=42):

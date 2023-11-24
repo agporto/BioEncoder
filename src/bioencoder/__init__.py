@@ -8,3 +8,4 @@ from .core import *
 
 from .scripts.split_dataset import split_dataset
 from .scripts.train import train
+from .scripts.swa import swa
