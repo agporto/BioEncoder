@@ -44,6 +44,14 @@ def train(
 
     ## set directories
     data_dir = os.path.join(root_dir, "data", run_name)
+    weights_dir = os.path.join(root_dir, "weights", run_name)
+    log_dir = os.path.join(root_dir, "logs")
+    run_dir = os.path.join(root_dir, "runs")
+    
+    ## create directories
+    os.makedirs(weights_dir,exist_ok=True)
+    os.makedirs(log_dir,exist_ok=True)
+    os.makedirs(run_dir,exist_ok=True)
 
     ## scaler
     scaler = torch.cuda.amp.GradScaler()
@@ -93,34 +101,14 @@ def train(
     if loss_optimizer is not None and stage == 'second':
         raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
     
-
-
     # handle logging (regular logs, tensorboard, and weights)
     if run_name is None:
-        logging_name = "stage_{}_model_{}".format(
+        run_name = "stage_{}_model_{}".format(
             stage, backbone
         )
-        print(f"WARNING: No run-name set - using {logging_name}!")
-    else:
-        logging_name = run_name
-
-    shutil.rmtree("weights/{}".format(logging_name), ignore_errors=True)
-    shutil.rmtree(
-        "runs/{}".format(logging_name),
-        ignore_errors=True,
-    )
-    shutil.rmtree(
-        "logs/{}".format(logging_name),
-        ignore_errors=True,
-    )
-    os.makedirs(
-        "logs/{}".format(logging_name),
-        exist_ok=True,
-    )
-
-    writer = SummaryWriter("runs", filename_suffix=logging_name)
-    logging_dir = "logs"
-    logging_path = os.path.join(logging_dir, f"{logging_name}.log")
+        print(f"WARNING: No run-name set - using {run_name}!")
+    writer = SummaryWriter(run_dir, filename_suffix= f"_{run_name}")
+    logging_path = os.path.join(log_dir, f"{run_name}.log")
     logging.basicConfig(filename=logging_path, level=logging.INFO, filemode="w+")
 
     # epoch loop
@@ -235,18 +223,13 @@ def train(
                 ),
             )
 
-            os.makedirs(
-                "weights/{}".format(logging_name),
-                exist_ok=True,
-            )
-
             torch.save(
                 {
                     "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                 },
-                "weights/{}/epoch{}".format(logging_name, epoch),
+                os.path.join(weights_dir, "epoch{epoch}"),
             )
             metric_best = valid_metrics[target_metric]
 
