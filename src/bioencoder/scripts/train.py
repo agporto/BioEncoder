@@ -82,6 +82,7 @@ def train(
         model = torch.nn.DataParallel(model)
         
     ## activate cuda
+    print(f"CUDA available: {torch.cuda.is_available()}")  
     model = model.cuda()
 
     optim = utils.build_optim(
@@ -229,7 +230,7 @@ def train(
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                 },
-                os.path.join(weights_dir, "epoch{epoch}"),
+                os.path.join(weights_dir, f"epoch{epoch}"),
             )
             metric_best = valid_metrics[target_metric]
 

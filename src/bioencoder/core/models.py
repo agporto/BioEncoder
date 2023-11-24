@@ -28,7 +28,7 @@ def create_encoder(backbone:str):
     try:
         if 'timm_' in backbone:
             backbone = backbone[5:]
-            print(backbone)
+            print(f"Using backbone: {backbone}")
             model = timm.create_model(model_name=backbone, pretrained=True)
         else:
             model = BACKBONES[backbone](pretrained=True)
