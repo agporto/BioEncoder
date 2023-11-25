@@ -4,10 +4,6 @@
 
 # BioEncoder: A toolkit for imageomics
 
-## Citatiob
-
-_to be added_
-
 ## About
 
 `BioEncoder` is a rich toolset for image classification and trait discovery in organismal biology. It relies on image classification models trained using metric learning to learn species trait data  (i.e., features) from images. This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
