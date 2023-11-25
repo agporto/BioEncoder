@@ -21,7 +21,6 @@ def train(
 
     ## parse config
     backbone = hyperparams["model"]["backbone"]
-    ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
     num_classes = hyperparams["model"]["num_classes"]
     amp = hyperparams["train"]["amp"]
     ema = hyperparams["train"]["ema"]
@@ -42,11 +41,12 @@ def train(
     root_dir = config.root_dir
     run_name = config.run_name
 
-    ## set directories
+    ## set directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
     weights_dir = os.path.join(root_dir, "weights", run_name)
     log_dir = os.path.join(root_dir, "logs")
     run_dir = os.path.join(root_dir, "runs")
+    swa_path = os.path.join(weights_dir, "swa")
     
     ## create directories
     os.makedirs(weights_dir,exist_ok=True)
@@ -73,7 +73,7 @@ def train(
         backbone,
         second_stage=(stage == "second"),
         num_classes=num_classes,
-        ckpt_pretrained=ckpt_pretrained,
+        ckpt_pretrained=swa_path,
     )
     
     ## configure multi-GPU system

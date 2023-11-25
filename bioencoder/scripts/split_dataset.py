@@ -16,7 +16,6 @@ def split_dataset(
     root_dir = config.root_dir
     run_name = config.run_name
     
-    
     dataset_directory = os.path.join(root_dir, "data", run_name)
     if not os.path.exists(dataset_directory):
         os.makedirs(dataset_directory)
@@ -77,9 +76,13 @@ def split_dataset(
 
 
 if __name__ == "__main__":
-
+    
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, help="path to the root directory")
+    parser.add_argument(
+        "--dataset", 
+        type=str, 
+        help="path to the root directory"
+    )
     parser.add_argument(
         "--val-percent",
         type=float,

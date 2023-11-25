@@ -7,6 +7,7 @@ name = "bioencoder"
 authors = [
     {name = "Arthur Porto", email = "agporto@gmail.com"},
 	{name = "Moritz Lürig", email = "moritz.luerig@gmail.com"},
+	]
 description = "A tool for imageomics"
 readme = "README.md"
 requires-python = "==3.9.*"
@@ -19,10 +20,11 @@ version = "0.1.0"
 "Bug Tracker" = "https://github.com/agporto/BioEncoder/issues"
 
 [project.scripts]
-split_dataset = "bioencoder.scripts.split_dataset:split_dataset"
+bioencoder_configure = "bioencoder.scripts.configure:configure"
+bioencoder_split_dataset = "bioencoder.scripts.split_dataset:split_dataset"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
