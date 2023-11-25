@@ -10,12 +10,11 @@ def configure(**kwargs):
     if kwargs.get("run_name"):
         config.run_name = kwargs.get("run_name")
         
-    print("BioEncoder config:")
-    { print(f"- {k}: {v}") for k,v in vars(config).items() if not k.startswith('__') }
-    print(f"Given the current WD ({os.getcwd()}), BioEncoder root directory will be:")
-    print(f"- {os.path.join(os.getcwd(), config.root_dir, config.run_name)}")
-
-
+    if not config.root_dir.__class__.__name__ == "NoneType":
+        print("BioEncoder config:")
+        { print(f"- {k}: {v}") for k,v in vars(config).items() if not k.startswith('__') }
+        print(f"Given the current WD ({os.getcwd()}), BioEncoder root directory will be:")
+        print(f"- {os.path.join(os.getcwd(), config.root_dir, config.run_name)}")
     
 if __name__ in {"__main__","bioencoder.scripts.configure"}:
        
