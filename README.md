@@ -2,11 +2,15 @@
 
 <p align="center"><img src="bioencoder_logo.png" width="300"></p>
 
-# BioEncoder
+# BioEncoder: A toolkit for imageomics
 
-## Image Classification and Trait Discovery in Organismal Biology
+## Citatiob
 
-This repository contains code for training, testing, and visualizing a `BioEncoder` model. `BioEncoder` is a rich toolset for learning species trait data from images. It relies on image classification models trained using metric learning to generate robust traits (i.e., features). This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
+_to be added_
+
+## About
+
+`BioEncoder` is a rich toolset for image classification and trait discovery in organismal biology. It relies on image classification models trained using metric learning to learn species trait data  (i.e., features) from images. This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
 
 - Taxon-agnostic dataloaders (making it applicable to any biological dataset)
 - Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391))
@@ -23,21 +27,22 @@ This repository contains code for training, testing, and visualizing a `BioEncod
 
 ## Install
 
-1. Clone the repo:
+1. Create a clean virtual environment 
 ```
-git clone https://github.com/agporto/BioEncoder && cd BioEncoder/
+mamba create -n bioencoder python=3.9
+mamba activate bioencoder
 ```
 
-2. Create a clean virtual environment 
+2. Install pytorch with CUDA. Go to https://pytorch.org/get-started/locally/ and choose your version - e.g.:
 ```
-conda create -n bioencoder python=3.7
-conda activate bioencoder
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 ```
-3. Install dependencies
+
+3. Install bioencoder from pypi:
 ````
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install bioencoder
 ````
+
 ## Dataset
 
 Here are the steps to follow to make sure your data is ready to train `BioEncoder`:
