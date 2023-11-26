@@ -31,10 +31,10 @@ def swa(
     run_name = config.run_name
     
     ## set directories
-    weights_dir = os.path.join(root_dir, "weights", run_name)
+    data_dir = os.path.join(root_dir, "data", run_name)
+    weights_dir = os.path.join(root_dir, "weights", run_name, stage)
     if os.path.exists(os.path.join(weights_dir, "swa")):
         os.remove(os.path.join(weights_dir, "swa"))
-    data_dir = os.path.join(root_dir, "data", run_name)
 
     ## scaler
     scaler = torch.cuda.amp.GradScaler()
@@ -73,7 +73,8 @@ def swa(
 
     torch.save({"model_state_dict": average_dict}, os.path.join(weights_dir, "swa"))
     model.load_state_dict(
-        torch.load(os.path.join(weights_dir, "swa"))["model_state_dict"]
+        torch.load(os.path.join(weights_dir, "swa"))["model_state_dict"], 
+        strict=False,
     )
 
     if stage == "first":

@@ -3,9 +3,12 @@ import logging
 import os
 import time
 import shutil
+import sys
+
+
+import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
-import torch
 
 from bioencoder import utils
 from bioencoder import config
@@ -43,11 +46,13 @@ def train(
 
     ## set directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
-    weights_dir = os.path.join(root_dir, "weights", run_name)
-    log_dir = os.path.join(root_dir, "logs")
-    run_dir = os.path.join(root_dir, "runs")
-    swa_path = os.path.join(weights_dir, "swa")
-    
+    log_dir = os.path.join(root_dir, "logs", run_name)
+    run_dir = os.path.join(root_dir, "runs", run_name, f"{run_name}_{stage}")
+    weights_dir = os.path.join(root_dir, "weights", run_name, stage)
+    swa_path = os.path.join(root_dir, "weights", run_name, stage, "swa")
+    if not os.path.isfile(swa_path):
+        swa_path = None
+        
     ## create directories
     os.makedirs(weights_dir,exist_ok=True)
     os.makedirs(log_dir,exist_ok=True)
@@ -81,10 +86,11 @@ def train(
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = torch.nn.DataParallel(model)
         
-    ## activate cuda
+    ## tie model into cuda
     print(f"CUDA available: {torch.cuda.is_available()}")  
     model = model.cuda()
 
+    ## configure optimizer
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
     )
@@ -101,15 +107,13 @@ def train(
 
     if loss_optimizer is not None and stage == 'second':
         raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
-    
-    # handle logging (regular logs, tensorboard, and weights)
+
+    ## handle logging (regular logs, tensorboard, and weights)
     if run_name is None:
-        run_name = "stage_{}_model_{}".format(
-            stage, backbone
-        )
+        run_name = f"{model}_{stage}"
         print(f"WARNING: No run-name set - using {run_name}!")
-    writer = SummaryWriter(run_dir, filename_suffix= f"_{run_name}")
-    logging_path = os.path.join(log_dir, f"{run_name}.log")
+    writer = SummaryWriter(run_dir)
+    logging_path = os.path.join(log_dir, f"{run_name}_{stage}.log")
     logging.basicConfig(filename=logging_path, level=logging.INFO, filemode="w+")
 
     # epoch loop
@@ -156,7 +160,7 @@ def train(
             model_copy.use_projection_head(True)
             
             print(
-                "epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\nvalid acc dict projection head {}\nvalid acc dict encoder {}".format(
+                "Epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\nvalid acc dict projection head {}\nvalid acc dict encoder {}".format(
                     epoch,
                     end_training_time - start_training_time,
                     time.time() - start_validation_time,
@@ -171,7 +175,7 @@ def train(
                 model, criterion, loaders["valid_loader"], scaler
             )
             print(
-                "epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\n valid acc dict {}\n".format(
+                "Epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\n valid acc dict {}\n".format(
                     epoch,
                     end_training_time - start_training_time,
                     time.time() - start_validation_time,
@@ -241,7 +245,7 @@ def train(
         scheduler.step()
 
     writer.close()
-
+    logging.shutdown()
 
 if __name__ == "__main__":
             
