@@ -75,7 +75,7 @@ def split_dataset(
             shutil.copy(img_path, dest_dir)
 
 
-if __name__ == "__main__":
+if __name__ in {"__main__","bioencoder.scripts.configure"}:
     
     parser = argparse.ArgumentParser()
     parser.add_argument(
