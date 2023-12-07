@@ -3,22 +3,24 @@ import argparse
 import shutil
 import random
 
+from bioencoder import utils
+
 def split_dataset(
         image_dir, 
         val_percent=0.1, 
         max_ratio=7,
+        **kwargs,
         ):
     
-    
-    
-    ## get parameters
+    ## load bioencoer config
+    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
+    ## directory management
     dataset_directory = os.path.join(root_dir, "data", run_name)
     if not os.path.exists(dataset_directory):
         os.makedirs(dataset_directory)
-
     train_directory = os.path.join(dataset_directory, "train")
     val_directory = os.path.join(dataset_directory, "val")
     os.makedirs(train_directory, exist_ok=True)
@@ -75,9 +77,7 @@ def split_dataset(
             
             
 def cli():
-    
-    print(__name__)
-    
+       
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--image-dir", 

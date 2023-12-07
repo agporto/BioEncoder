@@ -22,6 +22,7 @@ version = "0.1.0"
 [project.scripts]
 bioencoder_configure = "bioencoder.scripts.configure:cli"
 bioencoder_split_dataset = "bioencoder.scripts.split_dataset:cli"
+bioencoder_train = "bioencoder.scripts.train:cli"
 bioencoder_swa = "bioencoder.scripts.swa:cli"
 bioencoder_interactive_plots = "bioencoder.scripts.interactive_plots:cli"
 bioencoder_model_explorer = "bioencoder.scripts.model_explorer_wrapper:cli"

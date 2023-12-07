@@ -249,7 +249,7 @@ def cli():
     
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path",
+        "--config-path",
         type=str,
     )
     args = parser.parse_args()
