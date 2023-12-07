@@ -2,25 +2,25 @@ import argparse
 import logging
 import os
 import time
-import shutil
-import sys
-
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
 
 from bioencoder import utils
-from bioencoder import config
-
-
 
 def train(
     config_path,
+    **kwargs,
 ):
     
+    ## load bioencoer config
+    config = utils.load_config(kwargs.get("bioencoder_config_path"))
+    root_dir = config.root_dir
+    run_name = config.run_name
+    
     ## load config
-    hyperparams = utils.load_config(config_path)
+    hyperparams = utils.load_yaml(config_path)
 
     ## parse config
     backbone = hyperparams["model"]["backbone"]
@@ -39,10 +39,6 @@ def train(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-    
-    ## get parameters
-    root_dir = config.root_dir
-    run_name = config.run_name
 
     ## set directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
@@ -247,15 +243,21 @@ def train(
     writer.close()
     logging.shutdown()
 
-if __name__ in {"__main__","bioencoder.scripts.configure"}:
-            
+
+
+def cli():
+    
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_path",
         type=str,
-        default=None,
     )
     args = parser.parse_args()
-
+    
     train(args.config_path)
 
+
+
+if __name__ == "__main__":
+    
+    cli()

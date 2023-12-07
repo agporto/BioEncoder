@@ -1,10 +1,12 @@
 import random
 import os
 import numpy as np
+import yaml
+from dataclasses import make_dataclass
+
+import torch
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import f1_score, accuracy_score
-import torch
-import yaml
 
 from .losses import LOSSES
 from .optimizers import OPTIMIZERS
@@ -14,12 +16,27 @@ from .datasets import create_dataset
 from .augmentations import get_transforms
 
 
-def load_config(config_path):
+def load_yaml(yaml_path):
+    
+    with open(yaml_path, "r") as file:
+        dictionary = yaml.full_load(file)
 
-    with open(config_path, "r") as file:
-        params = yaml.full_load(file)
+    return dictionary
 
-    return params
+
+def load_config(config_path=None):
+    
+    if not config_path:
+        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")
+    
+    config = load_yaml(config_path)
+    dataclass = make_dataclass(
+        cls_name="config",
+        fields=config
+    )
+    config_dataclass = dataclass(**config)
+    
+    return config_dataclass
 
 
 def set_seed(seed=42):

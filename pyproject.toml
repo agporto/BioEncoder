@@ -20,11 +20,17 @@ version = "0.1.0"
 "Bug Tracker" = "https://github.com/agporto/BioEncoder/issues"
 
 [project.scripts]
-bioencoder_configure = "bioencoder.scripts.configure:configure"
-bioencoder_split_dataset = "bioencoder.scripts.split_dataset:split_dataset"
+bioencoder_configure = "bioencoder.scripts.configure:cli"
+bioencoder_split_dataset = "bioencoder.scripts.split_dataset:cli"
+bioencoder_swa = "bioencoder.scripts.swa:cli"
+bioencoder_interactive_plots = "bioencoder.scripts.interactive_plots:cli"
+bioencoder_model_explorer = "bioencoder.scripts.model_explorer_wrapper:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.package-data]
+assets = ["*.png"]

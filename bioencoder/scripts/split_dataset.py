@@ -3,14 +3,13 @@ import argparse
 import shutil
 import random
 
-from bioencoder import config
-
 def split_dataset(
         image_dir, 
         val_percent=0.1, 
         max_ratio=7,
-        **kwargs,
         ):
+    
+    
     
     ## get parameters
     root_dir = config.root_dir
@@ -26,7 +25,6 @@ def split_dataset(
     os.makedirs(val_directory, exist_ok=True)
 
     classes = os.listdir(image_dir)
-    class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
     images_per_class = [len(os.listdir(os.path.join(image_dir, cls))) for cls in classes]
     print(f"Number of images per class prior to balancing: {images_per_class}")
 
@@ -73,15 +71,18 @@ def split_dataset(
                 dest_dir = os.path.join(train_directory, class_)
             os.makedirs(dest_dir, exist_ok=True)
             shutil.copy(img_path, dest_dir)
-
-
-if __name__ in {"__main__","bioencoder.scripts.configure"}:
+            
+            
+            
+def cli():
+    
+    print(__name__)
     
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--dataset", 
+        "--image-dir", 
         type=str, 
-        help="path to the root directory"
+        help="path to the image directory"
     )
     parser.add_argument(
         "--val-percent",
@@ -96,4 +97,12 @@ if __name__ in {"__main__","bioencoder.scripts.configure"}:
         default=7,
     )
     args = parser.parse_args()
-    split_dataset(args.dataset, args.val_percent, args.ratio)
+    
+    split_dataset(args.image_dir, args.val_percent, args.ratio)
+
+
+
+if __name__ == "__main__":
+    
+    cli()
+

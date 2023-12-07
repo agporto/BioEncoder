@@ -1,19 +1,26 @@
+import argparse
 import os
 from collections import OrderedDict
+
 import torch
-import argparse
-import yaml
 
 from bioencoder import utils
-from bioencoder import config
 
 
 def swa(
     config_path, 
+    **kwargs,
 ):
     
-    hyperparams = utils.load_config(config_path)
-
+    ## load bioencoer config
+    config = utils.load_config(kwargs.get("bioencoder_config_path"))
+    root_dir = config.root_dir
+    run_name = config.run_name
+    
+    ## load config 
+    hyperparams = utils.load_yaml(config_path)
+    
+    ## parse config
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"]["num_classes"]
     top_k_checkoints = hyperparams["model"]["top_k_checkpoints"]
@@ -24,11 +31,6 @@ def swa(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-    
-    
-    ## get parameters
-    root_dir = config.root_dir
-    run_name = config.run_name
     
     ## set directories
     data_dir = os.path.join(root_dir, "data", run_name)
@@ -88,8 +90,10 @@ def swa(
 
     print("swa stage {} validation metrics: {}".format(stage, valid_metrics))
     
-if __name__ == "__main__":
-
+    
+    
+def cli():
+    
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_path",
@@ -99,3 +103,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     swa(args.config_path)
+    
+    
+    
+if __name__ == "__main__":
+    
+    cli()
