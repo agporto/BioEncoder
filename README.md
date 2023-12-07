@@ -105,16 +105,15 @@ project-dir/
 bioencoder_split_dataset --image-dir data_raw\damselflies_aligned_resized
 ```
 
-6\. Use `train_fullbody1_stage1.yml` to train the the first stage of the model:
-
-```
-bioencoder_train --config-path damselflies_config_files\train_fullbody1_stage1.yml"
-```
-
-7\. Continue as follows:
+6\. Use `train_stage1.yml` to train the the first stage of the model:
 
 ```
 bioencoder_train --config-path damselflies_config_files\train_stage1.yml"
+```
+
+Continue as follows:
+
+```
 bioencoder_swa --config-path damselflies_config_files\swa_stage1.yml"
 bioencoder_train --config-path damselflies_config_files\train_stage2.yml"
 bioencoder_swa --config-path damselflies_config_files\swa_stage2.yml"
@@ -124,13 +123,13 @@ Inspect the training runs with
 tensorboard --logdir bioencoder\runs\damselflies
 ```
 
-8\. Create interactive plots:
+7\. Create interactive plots:
 
 ``` 
 bioencoder_interactive_plots --config-path damselflies_config_files\plot_stage1.yml
 ```
 
-9\. Run the model explorer
+8\. Run the model explorer
 
 ``` 
 bioencoder_model_explorer --config-path config-path damselflies_config_files\explorer_stage1.yml
