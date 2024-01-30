@@ -114,13 +114,13 @@ bioencoder_train --config-path damselflies_config_files\train_stage1.yml"
 Continue as follows:
 
 ```
-bioencoder_swa --config-path damselflies_config_files\swa_stage1.yml"
-bioencoder_train --config-path damselflies_config_files\train_stage2.yml"
-bioencoder_swa --config-path damselflies_config_files\swa_stage2.yml"
+bioencoder_swa --config-path damselflies_config_files\swa_stage1.yml
+bioencoder_train --config-path damselflies_config_files\train_stage2.yml
+bioencoder_swa --config-path damselflies_config_files\swa_stage2.yml
 ```
 Inspect the training runs with 
 ```
-tensorboard --logdir bioencoder\runs\damselflies
+tensorboard --logdir bioencoder\runs\damselflies-example
 ```
 
 7\. Create interactive plots:
@@ -132,7 +132,7 @@ bioencoder_interactive_plots --config-path damselflies_config_files\plot_stage1.
 8\. Run the model explorer
 
 ``` 
-bioencoder_model_explorer --config-path config-path damselflies_config_files\explorer_stage1.yml
+bioencoder_model_explorer --config-path damselflies_config_files\explore_stage1.yml
 ```
 
 ## Interactive mode

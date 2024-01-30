@@ -18,9 +18,11 @@ def train(
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
+    print(config)
     
     ## load config
     hyperparams = utils.load_yaml(config_path)
+    print(hyperparams)
 
     ## parse config
     backbone = hyperparams["model"]["backbone"]
@@ -39,15 +41,16 @@ def train(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
+    ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
 
     ## set directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
     log_dir = os.path.join(root_dir, "logs", run_name)
     run_dir = os.path.join(root_dir, "runs", run_name, f"{run_name}_{stage}")
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
-    swa_path = os.path.join(root_dir, "weights", run_name, stage, "swa")
-    if not os.path.isfile(swa_path):
-        swa_path = None
+
+    if not ckpt_pretrained and stage == "second":
+        ckpt_pretrained = os.path.join(root_dir, "weights", run_name, 'first', "swa")
         
     ## create directories
     os.makedirs(weights_dir,exist_ok=True)
@@ -74,17 +77,14 @@ def train(
         backbone,
         second_stage=(stage == "second"),
         num_classes=num_classes,
-        ckpt_pretrained=swa_path,
-    )
+        ckpt_pretrained=ckpt_pretrained,
+    ).cuda()
     
     ## configure multi-GPU system
-    if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        model = torch.nn.DataParallel(model)
+    #if torch.cuda.device_count() > 1:
+    #    print("Let's use", torch.cuda.device_count(), "GPUs!")
+    #    model = torch.nn.DataParallel(model)
         
-    ## tie model into cuda
-    print(f"CUDA available: {torch.cuda.is_available()}")  
-    model = model.cuda()
 
     ## configure optimizer
     optim = utils.build_optim(
@@ -138,22 +138,22 @@ def train(
             ema.copy_to(model.parameters())
 
         start_validation_time = time.time()
+
         if stage == "first":
             valid_metrics_projection_head = utils.validation_constructive(
                 loaders["valid_loader"], loaders["train_features_loader"], model, scaler
             )
             
             ## check for GPU parallelization
-            if model.__class__.__name__ == "DataParallel":
-                model_copy = model.module
-            else:
-                model_copy = model
+            #model_copy = model.module if isinstance(model, torch.nn.DataParallel) else model
             
-            model_copy.use_projection_head(False)
+            #model_copy.use_projection_head(False)
+            model.use_projection_head(False)
             valid_metrics_encoder = utils.validation_constructive(
-                loaders["valid_loader"], loaders["train_features_loader"], model_copy, scaler
+                loaders["valid_loader"], loaders["train_features_loader"], model, scaler
             )
-            model_copy.use_projection_head(True)
+            model.use_projection_head(True)
+            #model_copy.use_projection_head(True)
             
             print(
                 "Epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\nvalid acc dict projection head {}\nvalid acc dict encoder {}".format(

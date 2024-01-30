@@ -75,8 +75,7 @@ def swa(
 
     torch.save({"model_state_dict": average_dict}, os.path.join(weights_dir, "swa"))
     model.load_state_dict(
-        torch.load(os.path.join(weights_dir, "swa"))["model_state_dict"], 
-        strict=False,
+        torch.load(os.path.join(weights_dir, "swa"))["model_state_dict"],
     )
 
     if stage == "first":
@@ -96,7 +95,7 @@ def cli():
     
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path",
+        "--config-path",
         type=str,
         default=None,
     )
