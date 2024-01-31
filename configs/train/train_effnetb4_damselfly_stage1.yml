@@ -1,5 +1,5 @@
 model:
-  backbone: timm_tf_efficientnet_b0 #timm_tf_efficientnet_b0
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k #timm_tf_efficientnet_b0
   ckpt_pretrained: 
   num_classes: # in the first stage of training we don't need num_classes, since we don't have a FC head
 
@@ -12,13 +12,13 @@ train:
   target_metric: precision_at_1
   stage: first # first = Supcon, second = FC finetuning for classification
 
-dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/bioencoder/
+dataset: data
 
 
 dataloaders:
-  train_batch_size: 40 # the higher - the better
-  valid_batch_size: 40
-  num_workers: 16 # set this to num of threads in your CPU
+  train_batch_size: 50 # the higher - the better
+  valid_batch_size: 50
+  num_workers: 32 # set this to num of threads in your CPU
 
 optimizer:
   name: SGD
@@ -36,7 +36,7 @@ criterion:
   params:
     temperature: 0.1
 
-img_size: &size 256
+img_size: &size 384
 
 augmentations:
   transforms: 

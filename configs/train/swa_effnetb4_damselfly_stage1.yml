@@ -1,5 +1,5 @@
 model:
-  backbone: timm_tf_efficientnet_b0
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
   num_classes:
   top_k_checkpoints: 3
 
@@ -8,12 +8,12 @@ train:
   weights_dir: weights/effnetb4_damselfly_stage1
   stage: first
 
-dataset: /home/ap/Dropbox/Year_2023/morph_moritz_aligned/bioencoder/
+dataset: data
 
 dataloaders:
-  train_batch_size: 40 # the higher - the better
-  valid_batch_size: 40
-  num_workers: 16 # set this to num of threads in your CPU
+  train_batch_size: 50 # the higher - the better
+  valid_batch_size: 50
+  num_workers: 32 # set this to num of threads in your CPU
 
 img_size: 384
 
