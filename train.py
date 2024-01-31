@@ -72,9 +72,9 @@ if __name__ == "__main__":
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
     )
-    if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        model = torch.nn.DataParallel(model)
+    # if torch.cuda.device_count() > 1:
+    #     print("Let's use", torch.cuda.device_count(), "GPUs!")
+    #     model = torch.nn.DataParallel(model)
     
     model = model.cuda()
 
