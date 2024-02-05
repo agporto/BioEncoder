@@ -281,9 +281,9 @@ def bokeh_plot(df, out_path='plot.html'):
     tools0 = [t() for t in TOOLS] + [hover0]
     tools1 = [t() for t in TOOLS] + [hover1]
     pca = bplot.figure(tools=tools0)
-    pca.circle('PC1', 'PC2', color='color', source=source)
+    pca.scatter('PC1', 'PC2', color='color', source=source, size=8)
     tsne = bplot.figure(tools=tools1)
-    tsne.circle('tSNE-0', 'tSNE-1', color='color', source=source)
+    tsne.scatter('tSNE-0', 'tSNE-1', color='color', source=source, size=8)
     p = bplot.gridplot([[pca, tsne]])
     bplot.show(p)
     return p

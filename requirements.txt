@@ -9,7 +9,7 @@ pytorch-metric-learning==2.0.1
 scikit-learn
 streamlit-option-menu
 tensorboard
-timm==0.6.12
+timm
 torch-ema==0.3.0
 torch-lr-finder
 torch-optimizer==0.3.0
