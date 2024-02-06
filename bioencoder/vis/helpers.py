@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import cv2
 import torch
 from torchvision import transforms
@@ -86,7 +87,7 @@ def show_cam_on_image(img, mask):
     
     Parameters:
     img (np.uint8): Original image as a numpy array of shape (H, W, 3) with values in [0, 255].
-    mask (np.uint8): Heatmap as a numpy array of shape (H, W) with values in [0, 1].
+    mask (np.uint8): Heatmap as a numpy array of shape (H, W) with values in [0,[1] 1].
     
     Returns:
     np.uint8: Combined image of shape (H, W, 3) with values in [0, 255].
@@ -233,7 +234,7 @@ def embbedings_dimension_reductions(data_table):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html'):
+def bokeh_plot(df, out_path='plot.html', **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
 
@@ -269,11 +270,20 @@ def bokeh_plot(df, out_path='plot.html'):
               """
     filenames = df['paths']
     df['image_files'] = filenames
-    num_classes = len(df['class'].unique())
-    cmap=plt.cm.get_cmap("jet", num_classes)
-    colors_raw = cmap((df['class']), bytes=True)
-    colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
-    df['color'] = colors_str
+    
+    ## color management
+    color_classes = kwargs.get("color_classes")
+    if not color_classes.__class__.__name__ == "NoneType":
+        df_col = pd.DataFrame.from_dict(color_classes.items())
+        df_col.columns = ["class_str","color"]
+        df = df.merge(df_col)
+    else:
+        num_classes = len(df['class'].unique())
+        cmap=plt.cm.get_cmap("jet", num_classes)
+        colors_raw = cmap((df['class']), bytes=True)
+        colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
+        df['color'] = colors_str
+        
     source = ColumnDataSource(df)
     bplot.output_file(out_path)
     hover0 = HoverTool(tooltips=tooltip)

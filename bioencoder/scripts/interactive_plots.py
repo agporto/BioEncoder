@@ -31,6 +31,8 @@ def interactive_plots(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
+    color_classes = hyperparams.get("color_classes")
+
     
     ## init scaler
     scaler = torch.cuda.amp.GradScaler()
@@ -74,7 +76,7 @@ def interactive_plots(
         os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
     ]
             
-    vis.bokeh_plot(df, out_path=os.path.join(plot_dir, f"{run_name}.html"))
+    vis.bokeh_plot(df, out_path=os.path.join(plot_dir, f"{run_name}.html"), color_classes=color_classes)
     
     
 def cli():
