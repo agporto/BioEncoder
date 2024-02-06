@@ -6,8 +6,8 @@ import torch
 
 from pathlib import Path
 
-from bioencoder import utils
-from bioencoder import vis
+from bioencoder.core import utils
+from bioencoder.vis import helpers
 
 def interactive_plots(    
         config_path, 
@@ -41,9 +41,11 @@ def interactive_plots(
     data_dir = os.path.join(root_dir,"data",  run_name)
     plot_dir = os.path.join(root_dir, "plots")
     os.makedirs(plot_dir, exist_ok=True)
-
+    
+    ## load weights
     ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, "swa")
 
+    ## set random seed
     utils.set_seed()
 
     transforms = utils.build_transforms(hyperparams)
@@ -63,7 +65,7 @@ def interactive_plots(
         loaders["valid_loader"], model, scaler
     )
     paths_train = [item[0] for item in loaders["valid_loader"].dataset.imgs]
-    reduced_data, colnames, _ = vis.embbedings_dimension_reductions(
+    reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(
         embeddings_train
     )
 
@@ -76,7 +78,7 @@ def interactive_plots(
         os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
     ]
             
-    vis.bokeh_plot(df, out_path=os.path.join(plot_dir, f"{run_name}.html"), color_classes=color_classes)
+    helpers.bokeh_plot(df, out_path=os.path.join(plot_dir, f"{run_name}.html"), color_classes=color_classes)
     
     
 def cli():

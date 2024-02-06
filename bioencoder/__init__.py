@@ -1,10 +1,6 @@
-# from . import vis
-# from . import core
-# from . import scripts
-
-## this might be removed in the future
-from .vis import *
-from .core import *
+# from .vis import *
+# from .core import *
+# from .scripts import *
 
 from .scripts.configure import configure
 from .scripts.split_dataset import split_dataset

@@ -3,7 +3,7 @@ import argparse
 import shutil
 import random
 
-from bioencoder import utils
+from bioencoder.core import utils
 
 def split_dataset(
         image_dir, 

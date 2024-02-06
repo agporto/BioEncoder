@@ -2,7 +2,10 @@ import argparse
 import os
 import yaml
 
-from bioencoder import utils
+from contextlib import redirect_stdout
+import io
+
+from bioencoder.core import utils
 import matplotlib.pyplot as plt
 from torch_lr_finder import LRFinder
 
@@ -23,7 +26,6 @@ def learning_rate_finder(
     ## parse config
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"]["num_classes"]
-    stage = hyperparams["model"]["stage"]
     optimizer_params = hyperparams["optimizer"]
     scheduler_params = None
     criterion_params = hyperparams["criterion"]
@@ -39,7 +41,7 @@ def learning_rate_finder(
     os.makedirs(plot_dir, exist_ok=True)
 
     ## load weights
-    ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, "swa")
+    ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, "first", "swa")
 
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(
@@ -64,13 +66,19 @@ def learning_rate_finder(
     lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
     lr_finder.range_test(loaders["train_features_loader"], end_lr=1, num_iter=300)
     fig, ax = plt.subplots()
-    lr_finder.plot(ax=ax)
     
-    plot_path = os.path.join(plot_dir, "{}_supcon_{}_bs_{}_stage_{}_lr_finder.png".format(
+    f = io.StringIO()
+    with redirect_stdout(f):
+        lr_finder.plot(ax=ax)
+    s = f.getvalue()
+    print_msg = s.split("\n")[1]
+    
+    fig.suptitle(print_msg, fontsize=20)
+    
+    plot_path = os.path.join(plot_dir, "{}_lr_finder_supcon_{}_bs_{}.png".format(
         run_name,
         optimizer_params["name"],
         batch_sizes["train_batch_size"],
-        "second",
     ))
 
     fig.savefig(plot_path)

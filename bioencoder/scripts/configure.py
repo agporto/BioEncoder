@@ -32,6 +32,10 @@ def configure(config_path=None, **kwargs):
     else:
         print("No root-dir or run-name provided - doing nothing.")
         
+    if not os.path.isdir(config["root_dir_abs"]):
+        rd = config["root_dir_abs"]
+        print(f"WARNING: {rd} does not appear to exist!")
+        
         
 
 def cli():

@@ -7,10 +7,11 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
 
-from bioencoder import utils
+from bioencoder.core import utils
 
 def train(
     config_path,
+    cuda_device=0,
     **kwargs,
 ):
     
@@ -18,11 +19,9 @@ def train(
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
-    print(config)
     
     ## load config
     hyperparams = utils.load_yaml(config_path)
-    print(hyperparams)
 
     ## parse config
     backbone = hyperparams["model"]["backbone"]
@@ -56,7 +55,11 @@ def train(
     os.makedirs(weights_dir,exist_ok=True)
     os.makedirs(log_dir,exist_ok=True)
     os.makedirs(run_dir,exist_ok=True)
-
+    
+    ## set cuda device
+    # device = torch.cuda.device(cuda_device)
+    torch.cuda.set_device(cuda_device)
+    print(f"Using CUDA device {cuda_device}")
     ## scaler
     scaler = torch.cuda.amp.GradScaler()
     if not amp:
@@ -252,9 +255,13 @@ def cli():
         "--config-path",
         type=str,
     )
+    parser.add_argument(
+        "--cuda-device",
+        type=int,
+    )
     args = parser.parse_args()
     
-    train(args.config_path)
+    train(args.config_path, args.cuda_device)
 
 
 

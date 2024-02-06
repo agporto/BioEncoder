@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import torch
 
-from bioencoder import utils
+from bioencoder.core import utils
 
 
 def swa(

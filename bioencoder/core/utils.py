@@ -196,7 +196,7 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
     
 
 
-def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=None):
+def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=None, device=None):
     """
     Build and load the SupCon model
 
