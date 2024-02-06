@@ -25,7 +25,7 @@ lib
 lib64
 local
 parts
-phenopype.egg-info
+bioencoder.egg-info
 spyder-debug.log
 *.egg-info
 node_modules
