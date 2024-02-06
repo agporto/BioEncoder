@@ -1,6 +1,6 @@
 
 
-<p align="center"><img src="https://github.com/agporto/BioEncoder/blob/master/images/logo.png" width="300"></p>
+<p align="center"><img src="https://github.com/agporto/BioEncoder/blob/main/images/logo.png" width="300"></p>
 
 # BioEncoder
 
