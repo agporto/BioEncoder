@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from torch_lr_finder import LRFinder
 
 
-def learning_rate_finder(    
+def lr_finder(    
         config_path, 
         **kwargs,
 ):
