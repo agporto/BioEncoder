@@ -92,7 +92,7 @@ def cli():
     )
     args = parser.parse_args()
     
-    learning_rate_finder(args.config_path)
+    lr_finder(args.config_path)
 
 
 if __name__ == "__main__":
