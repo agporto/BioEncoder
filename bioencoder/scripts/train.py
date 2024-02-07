@@ -11,7 +11,6 @@ from bioencoder.core import utils
 
 def train(
     config_path,
-    cuda_device=0,
     **kwargs,
 ):
     
@@ -56,10 +55,10 @@ def train(
     os.makedirs(log_dir,exist_ok=True)
     os.makedirs(run_dir,exist_ok=True)
     
-    ## set cuda device
-    # device = torch.cuda.device(cuda_device)
-    torch.cuda.set_device(cuda_device)
-    print(f"Using CUDA device {cuda_device}")
+    # ## set cuda device
+    # torch.cuda.set_device(cuda_device)
+    # print(f"Using CUDA device {cuda_device}")
+    
     ## scaler
     scaler = torch.cuda.amp.GradScaler()
     if not amp:
@@ -255,13 +254,9 @@ def cli():
         "--config-path",
         type=str,
     )
-    parser.add_argument(
-        "--cuda-device",
-        type=int,
-    )
     args = parser.parse_args()
     
-    train(args.config_path, args.cuda_device)
+    train(args.config_path)
 
 
 
