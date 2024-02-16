@@ -2,7 +2,9 @@ import random
 import os
 import numpy as np
 import yaml
-from dataclasses import make_dataclass
+
+from copy import deepcopy
+from dataclasses import make_dataclass, asdict
 
 import torch
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
@@ -37,6 +39,14 @@ def load_config(config_path=None):
     config_dataclass = dataclass(**config)
     
     return config_dataclass
+
+def update_config(config, config_path=None):
+    
+    if not config_path:
+        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")
+    
+    with open(config_path, 'w') as file:
+        yaml.dump(config.__dict__, file, default_flow_style=False)
 
 
 def set_seed(seed=42):

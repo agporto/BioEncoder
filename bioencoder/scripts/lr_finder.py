@@ -72,9 +72,12 @@ def lr_finder(
         lr_finder.plot(ax=ax)
     s = f.getvalue()
     print_msg = s.split("\n")[1]
+    print(print_msg)
+    
+    config.second_lr = print_msg.split(": ")[1]
+    utils.update_config(config)
     
     fig.suptitle(print_msg, fontsize=20)
-    
     plot_path = os.path.join(plot_dir, "{}_lr_finder_supcon_{}_bs_{}.png".format(
         run_name,
         optimizer_params["name"],

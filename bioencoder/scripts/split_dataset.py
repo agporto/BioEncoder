@@ -9,6 +9,7 @@ def split_dataset(
         image_dir, 
         val_percent=0.1, 
         max_ratio=7,
+        random_seed=42,
         **kwargs,
         ):
     
@@ -25,6 +26,7 @@ def split_dataset(
     val_directory = os.path.join(dataset_directory, "val")
     os.makedirs(train_directory, exist_ok=True)
     os.makedirs(val_directory, exist_ok=True)
+    
 
     classes = os.listdir(image_dir)
     images_per_class = [len(os.listdir(os.path.join(image_dir, cls))) for cls in classes]
@@ -64,7 +66,9 @@ def split_dataset(
             print(
                 f"Warning: {class_} contains more than {max_ratio * min_number} images. Only {max_ratio * min_number} images will be used."
             )
+            random.seed(random_seed)
             images_to_use = random.sample(img_paths, max_ratio * min_number)
+        random.seed(random_seed)
         val_images = random.sample(images_to_use, val_images_per_class)
         for img_path in images_to_use:
             if img_path in val_images:
