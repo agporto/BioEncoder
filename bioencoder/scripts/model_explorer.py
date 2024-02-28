@@ -3,10 +3,11 @@ import os
 
 import streamlit as st
 import torch
+
 from streamlit_option_menu import option_menu
 from PIL import Image
 
-from bioencoder import utils
+from bioencoder.core import utils
 from bioencoder import vis
 
 # Function to load the model
@@ -35,6 +36,8 @@ def model_explorer(
     root_dir = config.root_dir
     run_name = config.run_name
     
+    class_names = os.listdir(os.path.join(root_dir, "data", run_name, "train"))
+
     ## load config
     hyperparams = utils.load_yaml(config_path)
     
@@ -46,8 +49,6 @@ def model_explorer(
     ## get swa path
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, "swa")
     
-    print(ckpt_pretrained)
-
     if stage == 'first': 
         vis_funcs = ['Filters', 'Activations', 'Saliency']
     else:
@@ -110,11 +111,11 @@ def model_explorer(
             layers =[name.split('.')[0] for name, module in model.encoder.named_modules() if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
             layer_set = sorted(set(layers))
             layer = st.selectbox("Select a layer", list(layer_set), index=len(list(layer_set))-1)
-            target = st.selectbox("Select a target", list(range(num_classes)))
-            result = vis.contrast_cam(model, model.encoder,image,target_layer=[layer], target_category= target)
+            target = st.selectbox("Select a target", class_names)
+            result = vis.contrast_cam(model, model.encoder,image,target_layer=[layer], target_category=class_names.index(target))
             st.pyplot(result)
-            
-            
+        
+
 
 if __name__ == "__main__":
     

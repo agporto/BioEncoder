@@ -1,13 +1,13 @@
 import argparse
+import io
 import os
 import yaml
 
+import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
-import io
+from torch_lr_finder import LRFinder
 
 from bioencoder.core import utils
-import matplotlib.pyplot as plt
-from torch_lr_finder import LRFinder
 
 
 def lr_finder(    

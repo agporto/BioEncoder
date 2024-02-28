@@ -47,9 +47,22 @@ def train(
     run_dir = os.path.join(root_dir, "runs", run_name, f"{run_name}_{stage}")
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
 
-    ## manage checkpoints for stage 2
+    ## manage second stage
     if stage == "second":
+        
+        ## add learning rate from optimizer
+        if "second_lr" in config.__dict__.keys():
+            optimizer_params["params"] = {"lr": float(config.second_lr)}
+            print(f"Using LR value from global bioencoder config: {config.second_lr}")
+        elif "lr" in optimizer_params["params"].keys():
+            lr = optimizer_params["params"]["lr"]
+            print(f"Using LR value from global bioencoder config: {lr}")
+        else:
+            print("WARNING - no learning rate specified")
+        
+        ## fetch checkpoints from first stage
         ckpt_pretrained = os.path.join(root_dir, "weights", run_name, 'first', "swa")
+        
     else: 
     	ckpt_pretrained = None
     	
@@ -90,16 +103,6 @@ def train(
     #    print("Let's use", torch.cuda.device_count(), "GPUs!")
     #    model = torch.nn.DataParallel(model)   
 
-    ## add learning rate from optimizer
-    if "second_lr" in config.__dict__.keys():
-        optimizer_params["params"] = {"lr": float(config.second_lr)}
-        print(f"Using LR value from global bioencoder config: {config.second_lr}")
-    elif "lr" in optimizer_params["params"].keys():
-        lr = optimizer_params["params"]["lr"]
-        print(f"Using LR value from global bioencoder config: {lr}")
-    else:
-        print("WARNING - no learning rate specified")
-        
     ## configure optimizer
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
