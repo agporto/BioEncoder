@@ -65,128 +65,111 @@ def split_dataset(
     if not dry_run:
         if os.path.exists(dataset_directory) and overwrite==True:
             print(f"removing {dataset_directory} (ow=True)")
-            shutil.rmtree(dir)
-        else:
-            os.makedirs(train_directory)
-            os.makedirs(val_directory)
+            shutil.rmtree(dataset_directory)
+        os.makedirs(train_directory)
+        os.makedirs(val_directory)
     else:
         print("\n[dry run - not actually copying files]\n")
     
     ## get images 
-    classes = os.listdir(image_dir)
-    images_per_class = [len(os.listdir(os.path.join(image_dir, cls))) for cls in classes]  
+    class_names = os.listdir(image_dir)
+    all_n_images = [len(os.listdir(os.path.join(image_dir, cls))) for cls in class_names]  
     
-    print(f"Number of images per class prior to balancing: {images_per_class} ({sum(images_per_class)} total)")
+    print(f"Number of images per class prior to balancing: {all_n_images} ({sum(all_n_images)} total)")
     assert (
-        any(num < min_per_class for num in images_per_class) is False
+        any(num < min_per_class for num in all_n_images) is False
     ), f"Each class must contain at least {min_per_class} images. Please remove classes with fewer images."
 
     ## check for max ratio
-    min_num = min(images_per_class)
+    min_num = min(all_n_images)
     max_num = max_ratio * min_num
     print(f"Minimum number of images per class: {min_num} * max ratio {max_ratio} = {int(max_num)} max per class")
 
-    images_per_class = [min(max_num, num) for num in images_per_class]
-    print(f"Number of images per class after balancing: {images_per_class} ({sum(images_per_class)} total)")
+    all_n_images_balanced = [min(max_num, num) for num in all_n_images]
+    print(f"Number of images per class after balancing: {all_n_images_balanced} ({sum(all_n_images_balanced)} total)")
 
     if mode == "flat":
         
         ## feedback
-        num_val_images = int(val_percent * sum(images_per_class))
-        val_images_per_class = num_val_images // len(classes)
-        print(f"Mode \"flat\": {num_val_images} validation images in total, min. {val_images_per_class} per class - processing:\n")
+        n_images_val = int(sum(all_n_images_balanced) * val_percent)
+        class_n_images_val = int(n_images_val / len(class_names))
+        print(f"Mode \"flat\": {n_images_val} validation images in total, min. {class_n_images_val} per class - processing:\n")
         
-        for class_, num_class_images in zip(classes, images_per_class):
-            print(f"Processing class {class_}...")
-            class_dir = os.path.join(image_dir, class_)
-            img_paths = [os.path.join(class_dir, img) for img in os.listdir(class_dir)]
+        ## collect image paths and apply split
+        for class_name, class_n_images in zip(class_names, all_n_images_balanced):
+            print(f"Processing class {class_name}...")
+            class_dir = os.path.join(image_dir, class_name)
+            random.seed(random_seed)
+            class_images_selection = random.sample(os.listdir(class_dir), class_n_images)          
 
             ## check min training imgs
-            n_train_imgs = num_class_images - val_images_per_class
+            n_train_imgs = len(class_images_selection) - class_n_images_val
             if n_train_imgs < 50:
-                print(f"Warning: {class_} contains fewer than 50 images for training ({n_train_imgs}) - excluding this class!")
+                print(f"Warning: {class_name} contains fewer than 50 images for training ({n_train_imgs}) - excluding this class!")
                 continue
-            if val_images_per_class > n_train_imgs :
-                print(f"Warning: {class_} contains fewer images for training ({n_train_imgs}) than for validation ({val_images_per_class}) .")
-
-            ## check if too many
-            if num_class_images <= max_num:
-                images_to_use = img_paths
-            else:
-                print(f"Warning: {class_} contains more than {max_num} images. Only {max_num} images will be used.")
-                random.seed(random_seed)
-                images_to_use = random.sample(img_paths, max_num)
+            if class_n_images_val > n_train_imgs :
+                print(f"Warning: {class_name} contains fewer images for training ({n_train_imgs}) than for validation ({class_n_images_val}) .")
                 
-            ## randomly select from each class
-            random.seed(random_seed)
-            val_images = random.sample(images_to_use, val_images_per_class)
-            for img_path in images_to_use:
-                if img_path in val_images:
-                    dest_dir = os.path.join(val_directory, class_)
-                else:
-                    dest_dir = os.path.join(train_directory, class_)
-                if not dry_run:
+            ## apply split 
+            val_set = class_images_selection[:class_n_images_val]
+            train_set = class_images_selection[class_n_images_val:]    
+            if not dry_run:
+                for image_set, target_dir in zip([val_set, train_set], [val_directory, train_directory]):
+                    dest_dir = os.path.join(target_dir, class_name)
                     os.makedirs(dest_dir, exist_ok=True)
-                    shutil.copy(img_path, dest_dir)
+                    for image_name in image_set:
+                        shutil.copy(os.path.join(class_dir, image_name), dest_dir)
                 
-    elif mode == "random":
+    if mode == "random":
 
         ## feedback
-        sample_size = max(1, int(sum(images_per_class) * val_percent))
-        print(f"Mode \"random\": {sample_size} validation images in total, randomly selected across all classes - processing:\n")
+        n_images_val = int(sum(all_n_images_balanced) * val_percent)
+        print(f"Mode \"random\": {n_images_val} validation images in total, randomly selected across all classes - processing:\n")
         
-        ## collect image paths            
-        img_paths = []
-        for class_, num_class_images in zip(classes, images_per_class):
-            print(f"Processing class {class_}...")
-            class_dir = os.path.join(image_dir, class_)
+        ## collect image paths and subsample to balance     
+        class_images_selection = []
+        for class_name, class_n_images in zip(class_names, all_n_images_balanced):
+            print(f"Processing class {class_name}...")
+            class_dir = os.path.join(image_dir, class_name)
             random.seed(random_seed)
-            img_paths = img_paths + [os.path.join(class_dir, img) for img in random.sample(os.listdir(class_dir),num_class_images)]
+            class_images_selection = class_images_selection + [os.path.join(class_dir, image_name) for image_name in random.sample(os.listdir(class_dir), class_n_images)]
             
-        # Sample random files
+        ## subample from balanced set and apply split
         random.seed(random_seed)
-        val_set = random.sample(img_paths, sample_size)
-        train_set = set(img_paths) - set(val_set)
-        
-        for img_set, target_dir in zip(
-                [val_set, train_set], 
-                [val_directory, train_directory]):
-            for img_path in img_set:
-                class_ = os.path.basename(os.path.dirname(img_path))
-                dest_dir = os.path.join(target_dir, class_)
-            if not dry_run:
-                os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy(img_path, dest_dir)
+        val_set = random.sample(class_images_selection, n_images_val)
+        train_set = set(class_images_selection) - set(val_set)
+        if not dry_run:
+            for image_set, target_dir in zip([val_set, train_set], [val_directory, train_directory]):
+                for image_path in image_set:
+                    class_name = os.path.basename(os.path.dirname(image_path))
+                    dest_dir = os.path.join(target_dir, class_name)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    shutil.copy(image_path, dest_dir)
                 
-        final_val_set = dict(zip(os.listdir(val_directory), [len(os.listdir(os.path.join(val_directory, class_dir))) for class_dir in os.listdir(val_directory)]))
-        print(f"validation set: {final_val_set}")
+            final_val_set = dict(zip(os.listdir(val_directory), [len(os.listdir(os.path.join(val_directory, class_dir))) for class_dir in os.listdir(val_directory)]))
+            print(f"validation set: {final_val_set}")
                 
     elif mode == "fixed":
         
         ## feedback
-        images_per_class_val = [int(class_imgs * val_percent) for class_imgs in images_per_class] 
-        print(f"Mode \"fixed\": {sum(images_per_class_val)} validation images in total. {dict(zip(classes, images_per_class_val))} - processing:\n")
+        all_n_images_val = [int(n_images * val_percent) for n_images in all_n_images_balanced] 
+        print(f"Mode \"fixed\": {sum(all_n_images_val)} validation images in total. {dict(zip(class_names, all_n_images_val))} - processing:\n")
         
         ## collect image paths and apply split
-        img_paths, val_set = [], []
-        for class_, num_class_images in zip(classes, images_per_class_val):
-            print(f"Processing class {class_}...")
-            class_dir = os.path.join(image_dir, class_)
-            img_paths = img_paths + [os.path.join(class_dir, img) for img in os.listdir(class_dir)]
-            val_set = val_set + [os.path.join(class_dir, img) for img in random.sample(os.listdir(class_dir), num_class_images)]
-            
-        train_set = set(img_paths) - set(val_set)
-        
-        for img_set, target_dir in zip(
-                [val_set, train_set], 
-                [val_directory, train_directory]):
-            for img_path in img_set:
-                class_ = os.path.basename(os.path.dirname(img_path))
-                dest_dir = os.path.join(target_dir, class_)
+        for class_name, class_n_images in zip(class_names, all_n_images_balanced):
+            print(f"Processing class {class_name}...")
+            class_dir = os.path.join(image_dir, class_name)
+            random.seed(random_seed)
+            class_images_selection = random.sample(os.listdir(class_dir), class_n_images)
+            val_set = class_images_selection[:int(class_n_images * val_percent)]
+            train_set = class_images_selection[int(class_n_images * val_percent):]
             if not dry_run:
-                os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy(img_path, dest_dir)
-        
+                for image_set, target_dir in zip([val_set, train_set], [val_directory, train_directory]):
+                    dest_dir = os.path.join(target_dir, class_name)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    for image_name in image_set:
+                        shutil.copy(os.path.join(class_dir, image_name), dest_dir)
+                
 
         
 def cli():
