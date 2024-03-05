@@ -33,7 +33,11 @@ def interactive_plots(
     num_workers = hyperparams["dataloaders"]["num_workers"]
     color_classes = hyperparams.get("color_classes")
 
-    
+    ## set cuda device
+    cuda_device = kwargs.get("cuda_device",0)
+    torch.cuda.set_device(cuda_device)
+    print(f"Using CUDA device {cuda_device}")
+
     ## init scaler
     scaler = torch.cuda.amp.GradScaler()
     
@@ -57,6 +61,7 @@ def interactive_plots(
         second_stage=(stage == "second"),
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
+        cuda_device=cuda_device,
     ).cuda()
     model.use_projection_head(False)
     model.eval()
@@ -64,6 +69,10 @@ def interactive_plots(
     embeddings_train, labels_train = utils.compute_embeddings(
         loaders["valid_loader"], model, scaler
     )
+    
+    if kwargs.get("ret_embeddings"):
+        return embeddings_train, labels_train
+    
     paths_train = [item[0] for item in loaders["valid_loader"].dataset.imgs]
     reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(
         embeddings_train
@@ -77,7 +86,10 @@ def interactive_plots(
     df["class_str"] = [
         os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
     ]
-            
+    
+    if kwargs.get("ret_df"):
+        return df
+    
     helpers.bokeh_plot(df, out_path=os.path.join(plot_dir, f"{run_name}.html"), color_classes=color_classes)
     
     

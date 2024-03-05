@@ -1,5 +1,5 @@
 # from .vis import *
-# from .core import *
+from .core import utils
 # from .scripts import *
 
 from .scripts.configure import configure

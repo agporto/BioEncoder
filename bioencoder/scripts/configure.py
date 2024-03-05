@@ -34,7 +34,7 @@ def configure(config_path=None, **kwargs):
         
     if not os.path.isdir(config["root_dir_abs"]):
         rd = config["root_dir_abs"]
-        print(f"WARNING: {rd} does not appear to exist!")
+        print(f"{rd} does not exist but will be created when adding data!")
         
         
 

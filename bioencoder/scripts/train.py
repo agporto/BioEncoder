@@ -1,7 +1,11 @@
 import argparse
+import json
 import logging
 import os
 import time
+import sys 
+
+from rich.pretty import pretty_repr
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -41,36 +45,61 @@ def train(
     num_workers = hyperparams["dataloaders"]["num_workers"]
     ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
 
-    ## set directories and paths
+    ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
     log_dir = os.path.join(root_dir, "logs", run_name)
     run_dir = os.path.join(root_dir, "runs", run_name, f"{run_name}_{stage}")
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
+    os.makedirs(weights_dir,exist_ok=True)
+    os.makedirs(log_dir,exist_ok=True)
+    os.makedirs(run_dir,exist_ok=True)
+    
+    ## set up logging and tensorboard writer
+    writer = SummaryWriter(run_dir)
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    if (logger.hasHandlers()):
+        logger.handlers.clear()
+    log_file_path = os.path.join(log_dir, f"{run_name}_{stage}.log")
+    
+    ## logging: stdout handler
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(logging.DEBUG)
+    stdout_formatter = logging.Formatter('%(asctime)s: %(message)s', "%H:%M:%S")
+    stdout_handler.setFormatter(stdout_formatter)
+    logger.addHandler(stdout_handler)
+
+    ## logging: logfile handler
+    if os.path.isfile(log_file_path):
+        os.remove(log_file_path)
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter('%(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
 
     ## manage second stage
     if stage == "second":
         
         ## add learning rate from optimizer
-        if "second_lr" in config.__dict__.keys():
-            optimizer_params["params"] = {"lr": float(config.second_lr)}
-            print(f"Using LR value from global bioencoder config: {config.second_lr}")
-        elif "lr" in optimizer_params["params"].keys():
-            lr = optimizer_params["params"]["lr"]
-            print(f"Using LR value from global bioencoder config: {lr}")
+        if not "paramas" in optimizer_params:
+            optimizer_params["params"] = {}
+        if not "lr" in optimizer_params["params"].keys():
+            if "second_lr" in config.__dict__.keys():
+                optimizer_params["params"] = {"lr": float(config.second_lr)}
+                logger.info(f"Using LR value from global bioencoder config: {config.second_lr}")
         else:
-            print("WARNING - no learning rate specified")
+            lr = optimizer_params["params"]["lr"]
+            logger.info(f"Using LR value from local bioencoder config: {lr}")
+        if not "lr" in optimizer_params["params"]:
+            logger.info("WARNING - no learning rate specified")
         
         ## fetch checkpoints from first stage
         ckpt_pretrained = os.path.join(root_dir, "weights", run_name, 'first', "swa")
         
     else: 
     	ckpt_pretrained = None
-    	
-    ## create directories
-    os.makedirs(weights_dir,exist_ok=True)
-    os.makedirs(log_dir,exist_ok=True)
-    os.makedirs(run_dir,exist_ok=True)
-    
+
     # ## set cuda device
     # torch.cuda.set_device(cuda_device)
     # print(f"Using CUDA device {cuda_device}")
@@ -101,7 +130,7 @@ def train(
     ## configure multi-GPU system
     #if torch.cuda.device_count() > 1:
     #    print("Let's use", torch.cuda.device_count(), "GPUs!")
-    #    model = torch.nn.DataParallel(model)   
+    #    model = torch.nn.DataParallel(model)   feedback
 
     ## configure optimizer
     optim = utils.build_optim(
@@ -120,24 +149,21 @@ def train(
 
     if loss_optimizer is not None and stage == 'second':
         raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
-
-    ## handle logging (regular logs, tensorboard, and weights)
-    if run_name is None:
-        run_name = f"{model}_{stage}"
-        print(f"WARNING: No run-name set - using {run_name}!")
-    writer = SummaryWriter(run_dir)
-    logging_path = os.path.join(log_dir, f"{run_name}_{stage}.log")
-    logging.basicConfig(filename=logging_path, level=logging.INFO, filemode="w+")
-
+            
     # epoch loop
     metric_best = 0
     for epoch in range(n_epochs):
-        utils.add_to_logs(logging, "{}, epoch {}".format(time.ctime(), epoch))
-
+        logger.info(utils.pprint_fill_hbar(f"START - Epoch {epoch}"))
         start_training_time = time.time()
         if stage == "first":
             train_metrics = utils.train_epoch_constructive(
-                loaders["train_supcon_loader"], model, criterion, optimizer, scaler, ema, loss_optimizer
+                loaders["train_supcon_loader"], 
+                model, 
+                criterion, 
+                optimizer, 
+                scaler, 
+                ema, 
+                loss_optimizer
             )
         else:
             train_metrics = utils.train_epoch_ce(
@@ -172,14 +198,14 @@ def train(
             model.use_projection_head(True)
             #model_copy.use_projection_head(True)
             
-            print(
-                "Epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\nvalid acc dict projection head {}\nvalid acc dict encoder {}".format(
+            logger.info(
+                "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
                     epoch,
                     end_training_time - start_training_time,
                     time.time() - start_validation_time,
                     train_metrics["loss"],
-                    valid_metrics_projection_head,
-                    valid_metrics_encoder,
+                    pretty_repr(valid_metrics_projection_head),
+                    pretty_repr(valid_metrics_encoder),
                 )
             )
             valid_metrics = valid_metrics_projection_head
@@ -187,13 +213,13 @@ def train(
             valid_metrics = utils.validation_ce(
                 model, criterion, loaders["valid_loader"], scaler
             )
-            print(
-                "Epoch {}, train time {:.2f} valid time {:.2f} train loss {:.2f}\n valid acc dict {}\n".format(
+            logger.info(
+                "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
                     epoch,
                     end_training_time - start_training_time,
                     time.time() - start_validation_time,
                     train_metrics["loss"],
-                    valid_metrics,
+                    pretty_repr(valid_metrics),
                 )
             )
 
@@ -213,32 +239,14 @@ def train(
                 # in case valid metric is a list
                 pass
 
-        if stage == "first":
-            utils.add_to_logs(
-                logging,
-                "Epoch {}, train loss: {:.4f}\nvalid metrics projection head: {}\nvalid metric encoder: {}".format(
-                    epoch,
-                    train_metrics["loss"],
-                    valid_metrics_projection_head,
-                    valid_metrics_encoder,
-                ),
-            )
-        else:
-            utils.add_to_logs(
-                logging,
-                "Epoch {}, train loss: {:.4f} valid metrics: {}".format(
-                    epoch, train_metrics["loss"], valid_metrics
-                ),
-            )
         # check if the best value of metric changed. If so -> save the model
         if (
             valid_metrics[target_metric] > metric_best*0.99
         ):  # > 0 if wanting to save all models 
-            utils.add_to_logs(
-                logging,
+            logger.info(
                 "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(
                     target_metric, metric_best, valid_metrics[target_metric]
-                ),
+                )
             )
 
             torch.save(
@@ -256,10 +264,10 @@ def train(
             utils.copy_parameters_to_model(copy_of_model_parameters, model)
 
         scheduler.step()
-
+        logger.info(utils.pprint_fill_hbar(f"END - Epoch {epoch}"))
+                
     writer.close()
     logging.shutdown()
-
 
 
 def cli():
