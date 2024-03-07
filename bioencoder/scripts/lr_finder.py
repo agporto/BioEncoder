@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
 import io
 import os
-import yaml
 
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
@@ -9,12 +11,30 @@ from torch_lr_finder import LRFinder
 
 from bioencoder.core import utils
 
+#%%
 
 def lr_finder(    
         config_path, 
+        overwrite=False,
         **kwargs,
 ):
+    """
     
+
+    Parameters
+    ----------
+    config_path : TYPE
+        DESCRIPTION.
+    overwrite : TYPE, optional
+        DESCRIPTION. The default is False.
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
@@ -40,6 +60,15 @@ def lr_finder(
     plot_dir = os.path.join(root_dir, "plots")
     os.makedirs(plot_dir, exist_ok=True)
 
+    ## construct file path
+    plot_path = os.path.join(plot_dir, "{}_lr_finder_supcon_{}_bs_{}.png".format(
+        run_name,
+        optimizer_params["name"],
+        batch_sizes["train_batch_size"],
+    ))
+    if not overwrite:
+        assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
+    
     ## load weights
     ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, "first", "swa")
 
@@ -78,11 +107,6 @@ def lr_finder(
     utils.update_config(config)
     
     fig.suptitle(print_msg, fontsize=20)
-    plot_path = os.path.join(plot_dir, "{}_lr_finder_supcon_{}_bs_{}.png".format(
-        run_name,
-        optimizer_params["name"],
-        batch_sizes["train_batch_size"],
-    ))
 
     fig.savefig(plot_path)
 

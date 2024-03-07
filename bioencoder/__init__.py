@@ -2,6 +2,7 @@
 from .core import utils
 # from .scripts import *
 
+from .scripts.archive import archive
 from .scripts.configure import configure
 from .scripts.split_dataset import split_dataset
 from .scripts.train import train

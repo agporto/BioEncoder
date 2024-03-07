@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
-import json
 import logging
 import os
 import time
+import shutil
 import sys 
 
 from rich.pretty import pretty_repr
@@ -13,10 +16,35 @@ from torch_ema import ExponentialMovingAverage
 
 from bioencoder.core import utils
 
+#%%
+
 def train(
     config_path,
+    overwrite,
     **kwargs,
 ):
+    """
+    
+
+    Parameters
+    ----------
+    config_path : TYPE
+        DESCRIPTION.
+    overwrite : TYPE
+        DESCRIPTION.
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Raises
+    ------
+    ValueError
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
@@ -50,10 +78,20 @@ def train(
     log_dir = os.path.join(root_dir, "logs", run_name)
     run_dir = os.path.join(root_dir, "runs", run_name, f"{run_name}_{stage}")
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
-    os.makedirs(weights_dir,exist_ok=True)
-    os.makedirs(log_dir,exist_ok=True)
-    os.makedirs(run_dir,exist_ok=True)
-    
+    for directory in [log_dir, run_dir, weights_dir]:
+        if os.path.exists(directory) and overwrite==True:
+            print(f"removing {directory} (overwrite=True)")
+            shutil.rmtree(directory)
+        os.makedirs(directory)
+        
+    ## collect information on data
+    train_dir, val_dir = os.path.join(data_dir, "train"), os.path.join(data_dir, "val")
+    class_names, data_stats = os.listdir(train_dir),{"data_dir": data_dir}
+    data_stats["train"], data_stats["val"] = {},{}
+    for class_name in class_names:
+        data_stats["train"][class_name] = len(os.listdir(os.path.join(train_dir, class_name)))
+        data_stats["val"][class_name] = len(os.listdir(os.path.join(val_dir, class_name)))
+
     ## set up logging and tensorboard writer
     writer = SummaryWriter(run_dir)
     logger = logging.getLogger()
@@ -77,13 +115,15 @@ def train(
     file_formatter = logging.Formatter('%(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
-
+    
     ## manage second stage
     if stage == "second":
         
-        ## add learning rate from optimizer
-        if not "paramas" in optimizer_params:
+        ## add learning rate
+        if not "params" in optimizer_params:
             optimizer_params["params"] = {}
+        if kwargs.get("lr"):
+            optimizer_params["params"]["lr"] = kwargs.get("lr")
         if not "lr" in optimizer_params["params"].keys():
             if "second_lr" in config.__dict__.keys():
                 optimizer_params["params"] = {"lr": float(config.second_lr)}
@@ -91,14 +131,18 @@ def train(
         else:
             lr = optimizer_params["params"]["lr"]
             logger.info(f"Using LR value from local bioencoder config: {lr}")
-        if not "lr" in optimizer_params["params"]:
-            logger.info("WARNING - no learning rate specified")
+            
+        assert "lr" in optimizer_params["params"], "no learning rate specified"
         
         ## fetch checkpoints from first stage
-        ckpt_pretrained = os.path.join(root_dir, "weights", run_name, 'first', "swa")
-        
+        ckpt_pretrained = os.path.join(root_dir, "weights", run_name, 'first', "swa") 
     else: 
-    	ckpt_pretrained = None
+    	ckpt_pretrained = None   
+    
+    ## add hyperparams to log
+    logger.info(utils.pprint_fill_hbar(f"Training {stage} stage ", symbol="#"))
+    logger.info(f"Dataset:\n{pretty_repr(data_stats)}")
+    logger.info(f"Hyperparameters:\n{pretty_repr(hyperparams)}")
 
     # ## set cuda device
     # torch.cuda.set_device(cuda_device)

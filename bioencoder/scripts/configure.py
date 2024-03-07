@@ -1,10 +1,31 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
 import os
 import yaml
 
+#%%
 
+def configure(
+        config_path=None, 
+        **kwargs
+        ):
+    """
+    
 
-def configure(config_path=None, **kwargs):
+    Parameters
+    ----------
+    config_path : TYPE, optional
+        DESCRIPTION. The default is None.
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     
     if not config_path:
         config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")

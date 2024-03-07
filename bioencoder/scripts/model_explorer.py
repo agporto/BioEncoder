@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
 import os 
 
@@ -9,6 +12,8 @@ from PIL import Image
 
 from bioencoder.core import utils
 from bioencoder import vis
+
+#%%
 
 # Function to load the model
 @st.cache_resource
@@ -30,7 +35,23 @@ def model_explorer(
         config_path,
         **kwargs,
         ):
+    """
     
+
+    Parameters
+    ----------
+    config_path : TYPE
+        DESCRIPTION.
+    **kwargs : TYPE
+        DESCRIPTION.
+     : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir

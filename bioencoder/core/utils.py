@@ -3,6 +3,7 @@ import os
 import numpy as np
 import yaml
 import io
+import zipfile 
 
 from contextlib import redirect_stdout
 from dataclasses import make_dataclass
@@ -40,6 +41,23 @@ def load_config(config_path=None):
     config_dataclass = dataclass(**config)
     
     return config_dataclass
+
+
+def load_model(
+        ckpt_pretrained, 
+        backbone, 
+        num_classes, 
+        stage,
+        cuda_device
+        ):
+    model = build_model(
+        backbone, second_stage=(stage == 'second'), 
+        num_classes=num_classes, ckpt_pretrained=ckpt_pretrained, 
+        cuda_device=cuda_device).cuda(cuda_device)
+    model.use_projection_head((stage=='second'))
+    model.eval()
+    
+    return model
 
 def update_config(config, config_path=None):
     
@@ -82,6 +100,14 @@ def pprint_fill_hbar(message, symbol="-", ret=True):
         print(formatted_message)
     else:
         return formatted_message
+    
+def zip_directory(directory, rel_to, zip):
+    for root, _, files in os.walk(directory):
+        for file in files:
+            file_path_abs = os.path.join(root, file)
+            file_path_rel = os.path.relpath(file_path_abs, rel_to)
+            zip.write(file_path_abs, file_path_rel)
+
 
 
 def add_to_tensorboard_logs(writer, message, tag, index):

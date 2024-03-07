@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import argparse
 import shutil
@@ -37,7 +40,7 @@ def split_dataset(
         The maximium ratio between the least and most abdundant class. Images 
         in the most abundant class beyond this ratio will be excluded by random 
         selection. The default is 7.
-    min_images : TYPE, optional
+    min_per_class : TYPE, optional
         DESCRIPTION. The default is 20.
     dry_run : TYPE, optional
         DESCRIPTION. The default is False.
@@ -53,7 +56,7 @@ def split_dataset(
 
     """
     
-    ## load bioencoer config
+    ## load bioencoer configmin_images
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name

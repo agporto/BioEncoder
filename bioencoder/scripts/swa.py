@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
 import os
 from collections import OrderedDict
@@ -6,12 +9,27 @@ import torch
 
 from bioencoder.core import utils
 
+#%%
 
 def swa(
     config_path, 
     **kwargs,
 ):
+    """
     
+
+    Parameters
+    ----------
+    config_path : TYPE
+        DESCRIPTION.
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
