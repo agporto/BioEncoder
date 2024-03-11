@@ -1,6 +1,4 @@
-
-
-<p align="center"><img src="https://github.com/agporto/BioEncoder/blob/raw/bioencoder_logo.png" width="300"></p>
+<p align="center"><img src="https://github.com/agporto/BioEncoder/raw/main/bioencoder_logo.png" width="300"></p>
 
 # BioEncoder: A toolkit for imageomics
 
