@@ -20,7 +20,7 @@ from bioencoder.core import utils
 
 def train(
     config_path,
-    overwrite,
+    overwrite=False,
     **kwargs,
 ):
     """

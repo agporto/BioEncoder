@@ -70,14 +70,21 @@ def interactive_plots(
         loaders["valid_loader"], model, scaler
     )
     
-    if kwargs.get("ret_embeddings"):
-        return embeddings_train, labels_train
-    
+
     paths_train = [item[0] for item in loaders["valid_loader"].dataset.imgs]
+    
+    if kwargs.get("ret_embeddings"):
+        
+        df = pd.DataFrame([os.path.basename(item) for item in paths_train], columns=["image_name"])
+        df["class"] = [
+            os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
+        ]
+        return pd.concat([df, pd.DataFrame(embeddings_train)], axis=1)
+    
+
     reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(
         embeddings_train
-    )
-
+    )       
     df = pd.DataFrame(reduced_data, columns=colnames)
     df["paths"] = [
         os.path.join("..", "..", item) for item in paths_train
@@ -86,9 +93,6 @@ def interactive_plots(
     df["class_str"] = [
         os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
     ]
-    
-    if kwargs.get("ret_df"):
-        return df
     
     helpers.bokeh_plot(df, out_path=os.path.join(plot_dir, f"{run_name}.html"), color_classes=color_classes)
     
