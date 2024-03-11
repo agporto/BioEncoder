@@ -1,12 +1,12 @@
 
 
-<p align="center"><img src="https://github.com/agporto/BioEncoder/blob/main/images/logo.png" width="300"></p>
+<p align="center"><img src="https://github.com/agporto/BioEncoder/blob/master/images/logo.png" width="300"></p>
 
-# BioEncoder
+# BioEncoder: A toolkit for imageomics
 
-## Image Classification and Trait Discovery in Organismal Biology
+## About
 
-This repository contains code for training, testing, and visualizing a `BioEncoder` model. `BioEncoder` is a rich toolset for learning species trait data from images. It relies on image classification models trained using metric learning to generate robust traits (i.e., features). This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
+`BioEncoder` is a rich toolset for image classification and trait discovery in organismal biology. It relies on image classification models trained using metric learning to learn species trait data  (i.e., features) from images. This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). It includes the following features:
 
 - Taxon-agnostic dataloaders (making it applicable to any biological dataset)
 - Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391))
@@ -23,104 +23,142 @@ This repository contains code for training, testing, and visualizing a `BioEncod
 
 ## Install
 
-1. Clone the repo:
+1\. Create a clean virtual environment 
 ```
-git clone https://github.com/agporto/BioEncoder && cd BioEncoder/
+mamba create -n bioencoder python=3.9
+mamba activate bioencoder
 ```
 
-2. Create a clean virtual environment 
+2\. Install pytorch with CUDA. Go to https://pytorch.org/get-started/locally/ and choose your version - e.g.:
 ```
-conda create -n bioencoder python=3.7
-conda activate bioencoder
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 ```
-3. Install dependencies
+
+3\. Install bioencoder from pypi:
 ````
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install bioencoder
 ````
-## Dataset
 
-Here are the steps to follow to make sure your data is ready to train `BioEncoder`:
+## Get started (CLI mode)
 
-1 ) Organize your data using the following structure:
-```
-project/
-    data_directory/
-        class_1/
-            image_1.jpg
-            image_2.jpg
-            ...
-        class_2/
-            image_1.jpg
-            image_2.jpg
-            ...
-        ...
-```
-You can have as many subdirectories as you need, depending on the number of classes in your classification task. The key is to make sure that all images belonging to the same class are stored in the same subdirectory. Also, you do not need to worry about image resolution at this stage. The images will be resized during training using the parameters defined within the `YAML` configuration files. If a single class contains an overwhelming percentage of images, please consider undersampling it.
+(for detailed information consult [the help files](docs\01-detailed-readme.md))
 
-2 ) Split into train and val sets 
- 
-To split the data into `train` and `val` sets, simply run :
+1\. Download the example [image dataset](https://osf.io/download/gsd5z/) and the [yaml configuration](https://osf.io/download/wb5ga/) and unzip the files 
+
+2\. Activate your environment
 
 ```
-python split_dataset.py --dataset /path/to/data_directory
-
-```
-The `split_dataset.py` script is a command line tool that takes as input a path to a root directory containing subdirectories of images, and splits the data into `train` and `val` sets. The `val` set contains 10% of the images, but they are evenly distributed across classes. This is done to ensure that validation metrics will not be influenced by the dominant classes. If a class does not contain enough images, that class is ignored (with a warning being displayed). The remaining 90% of images go to the `train` set.
-
-This will create the following directory structure under the `project/` folder:
-
-```
-project/
-    root_directory/
-    bioencoder/
-        train/
-        val/
-```
-## Configuration
-
-`Bioencoder` relies on `YAML` files to control the training process. Each `YAML` file contains several hyperparameters that can be modified according to users needs. These hyperparameters include:
-
-- Model architecture
-- Augmentations
-- Loss functions
-- etc..
-
-Example config files can be found in the `configs/train` folder. These files provide a starting point for training `Bioencoder` models and can be modified to suit specific use cases.
-
-
-## Training
-
-To train the model, run the following commands:
-
-```
-python train.py --config_name configs/train/train_effnetb4_damselfly_stage1.yml
-python swa.py --config_name configs/train/swa_effnetb4_damselfly_stage1.yml
-python train.py --config_name configs/train/train_effnetb4_damselfly_stage2.yml
-python swa.py --config_name configs/train/swa_effnetb4_damselfly_stage2.yml
+mamba activate bioencoder
 ```
 
-In order to run `LRFinder` on the second stage of the training, run:
+3\. Run `bioencoder_configure` to set the bioencoder root dir and the run name - for example:
 ```
-python learning_rate_finder.py --config_name configs/train/lr_finder_effnetb4_damselfly_stage2.yml
+bioencoder_configure --root-dir bioencoder --run-name damselflies-example
+```
+This will create a root folder inside your project, where all relevant bioencoder data, logs, etc. will be stored - it will look like this
+
+```
+project-dir/
+    bioencoder-root-dir/
+        data
+            <run-name>
+                train
+                    class_1/
+                        image_1.jpg
+                        image_2.jpg
+                        ...
+                    class_2/
+                        image_1.jpg
+                        image_2.jpg
+                        ...
+                    ...
+                val
+                    ...
+        logs
+            <run-name>
+                <run-name>.log
+        plots
+            <run-name>.html
+        runs
+            <run-name>
+                <run-name>_first
+                    events.out.tfevents.1700919284.machine-name.15832.0
+                <run-name>_second
+                    events.out.tfevents.1700919284.machine-name.15832.1
+        weights
+            <run-name>
+                first
+                    epoch0
+                    epoch1
+                    ...
+                    swa
+                second
+                    epoch0
+                    epoch1
+                    ...
+                    swa
+    ...
+```                 
+
+5\. Now run `bioencoder_split_dataset` to create the data folder containing training and validation images
+```
+bioencoder_split_dataset --image-dir data_raw\damselflies_aligned_resized
 ```
 
-After that you can check the results of the training either in `logs` or `runs` directory. For example, in order to check tensorboard logs for the first stage of `Damselfly` training, run:
-```
-tensorboard --logdir runs/effnetb4_damselfly_stage1
-```
-## Visualizations 
+6\. Use `train_stage1.yml` to train the the first stage of the model:
 
-This repo is supplied with [interactive](https://bokeh.org/) PCA and T-SNE visualizations so that you can check the embeddings you get after the training. To generate the interactive plot, use:
 ```
-python interactive_plots.py --config_name configs/plot/plot_effnetb4_damselfly_stage1.yml
+bioencoder_train --config-path damselflies_config_files\train_stage1.yml"
 ```
-Similarly, we provide a model visualization playground, where individuals can get further insight into their data. To launch the app and explore the final classification model, simply use:
-```
-streamlit run model_explorer.py -- --ckpt_pretrained ./weights/effnetb4_damselfly_stage2/swa --stage second --num_classes 4
-```
-Model visualization techniques vary between `first` and `second` stage, so please make sure you select the appropriate ones.
 
-## Custom datasets
+Continue as follows:
 
-`BioEncoder` was designed so that it could be easily applied to your custom dataset. Simply change the information on the configuration files (e.g., number of classes and dataset directory).
+```
+bioencoder_swa --config-path damselflies_config_files\swa_stage1.yml
+bioencoder_train --config-path damselflies_config_files\train_stage2.yml
+bioencoder_swa --config-path damselflies_config_files\swa_stage2.yml
+```
+Inspect the training runs with 
+```
+tensorboard --logdir bioencoder\runs\damselflies-example
+```
+
+7\. Create interactive plots:
+
+``` 
+bioencoder_interactive_plots --config-path damselflies_config_files\plot_stage1.yml
+```
+
+8\. Run the model explorer
+
+``` 
+bioencoder_model_explorer --config-path damselflies_config_files\explore_stage1.yml
+```
+
+## Interactive mode
+
+```
+import os
+import bioencoder
+
+## set your project dir
+os.chdir(r"D:\temp\bioencoder-test")
+
+## set project dir and run name
+bioencoder.configure(root_dir = r"bioencoder", run_name = "damselflies1")
+
+## split dataset 
+bioencoder.split_dataset(image_dir=r"data_raw\damselflies_aligned_resized")
+
+## training / swa
+bioencoder.train(config_path=r"damselflies_config_files\train_stage1.yml")
+bioencoder.swa(config_path=r"damselflies_config_files\swa_stage1.yml")
+bioencoder.train(config_path=r"damselflies_config_files\train_stage2.yml")
+bioencoder.swa(config_path=r"damselflies_config_files\swa_stage2.yml")
+
+## interactive plots
+bioencoder.interactive_plots(config_path=r"damselflies_config_files\plot_stage1.yml")
+
+## model explorer
+bioencoder.model_explorer(config_path=r"damselflies_config_files\explore_stage1.yml")
+```

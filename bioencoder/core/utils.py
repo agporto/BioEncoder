@@ -1,9 +1,16 @@
 import random
 import os
 import numpy as np
-from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
-from sklearn.metrics import f1_score, accuracy_score
+import yaml
+import io
+import zipfile 
+
+from contextlib import redirect_stdout
+from dataclasses import make_dataclass
+
 import torch
+from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
+from sklearn.metrics import f1_score #, accuracy_score
 
 from .losses import LOSSES
 from .optimizers import OPTIMIZERS
@@ -11,6 +18,54 @@ from .schedulers import SCHEDULERS
 from .models import SupConModel
 from .datasets import create_dataset
 from .augmentations import get_transforms
+
+
+def load_yaml(yaml_path):
+    
+    with open(yaml_path, "r") as file:
+        dictionary = yaml.full_load(file)
+
+    return dictionary
+
+
+def load_config(config_path=None):
+    
+    if not config_path:
+        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")
+    
+    config = load_yaml(config_path)
+    dataclass = make_dataclass(
+        cls_name="config",
+        fields=config
+    )
+    config_dataclass = dataclass(**config)
+    
+    return config_dataclass
+
+
+def load_model(
+        ckpt_pretrained, 
+        backbone, 
+        num_classes, 
+        stage,
+        cuda_device
+        ):
+    model = build_model(
+        backbone, second_stage=(stage == 'second'), 
+        num_classes=num_classes, ckpt_pretrained=ckpt_pretrained, 
+        cuda_device=cuda_device).cuda(cuda_device)
+    model.use_projection_head((stage=='second'))
+    model.eval()
+    
+    return model
+
+def update_config(config, config_path=None):
+    
+    if not config_path:
+        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")
+    
+    with open(config_path, 'w') as file:
+        yaml.dump(config.__dict__, file, default_flow_style=False)
 
 
 def set_seed(seed=42):
@@ -28,15 +83,31 @@ def set_seed(seed=42):
     torch.backends.cudnn.deterministic = True
 
 
-def add_to_logs(logging, message):
-    """Add a message to a logging object.
+def pprint_fill_hbar(message, symbol="-", ret=True):
+    terminal_width = os.get_terminal_size()[0]
+    message_length = len(message)
 
-    Parameters:
-    logging (logging.Logger): The logging object to add the message to.
-    message (str): The message to be logged.
+    if message_length >= terminal_width:
+        formatted_message = message
+    else:
+        bar_length = (terminal_width - message_length - 2) // 2
+        horizontal_bar = symbol * bar_length
+        formatted_message = f"{horizontal_bar} {message} {horizontal_bar}"
+        residual = terminal_width - len(formatted_message)
+        formatted_message = formatted_message + symbol * residual
+        
+    if not ret:
+        print(formatted_message)
+    else:
+        return formatted_message
+    
+def zip_directory(directory, rel_to, zip):
+    for root, _, files in os.walk(directory):
+        for file in files:
+            file_path_abs = os.path.join(root, file)
+            file_path_rel = os.path.relpath(file_path_abs, rel_to)
+            zip.write(file_path_abs, file_path_rel)
 
-    """
-    logging.info(message)
 
 
 def add_to_tensorboard_logs(writer, message, tag, index):
@@ -170,7 +241,7 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
     
 
 
-def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=None):
+def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=None, cuda_device=0):
     """
     Build and load the SupCon model
 
@@ -187,7 +258,7 @@ def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=
     model = SupConModel(backbone=backbone, second_stage=second_stage, num_classes=num_classes)
 
     if ckpt_pretrained:
-        model.load_state_dict(torch.load(ckpt_pretrained)['model_state_dict'], strict=False)
+        model.load_state_dict(torch.load(ckpt_pretrained, map_location=torch.device(cuda_device))['model_state_dict'], strict=False)
 
     return model
 
@@ -349,12 +420,14 @@ def validation_constructive(valid_loader, train_loader, model, scaler):
     Returns:
         acc_dict (dict): A dictionary containing the accuracy metrics, computed using the `AccuracyCalculator` class.
     """
+    ## capture output containing warnings in buffer
 
-    calculator = AccuracyCalculator(k=1)
+    calculator = AccuracyCalculator(k=1, exclude=["r_precision","mean_average_precision_at_r"])
     model.eval()
 
     query_embeddings, query_labels = compute_embeddings(valid_loader, model, scaler)
     reference_embeddings, reference_labels = compute_embeddings(train_loader, model, scaler)
+    
 
     acc_dict = calculator.get_accuracy(
         query_embeddings,
@@ -416,39 +489,33 @@ def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
 
 
 def validation_ce(model, criterion, valid_loader, scaler):
-    """
-    Validates the given model with cross entropy loss and calculates several evaluation metrics such as accuracy, F1 scores and F1 score macro.
-
-    Parameters:
-    model (torch.nn.Module): The model to be validated.
-    criterion (torch.nn.modules.loss._Loss): The criterion to be used for validation, which is cross entropy loss in this case.
-    valid_loader (torch.utils.data.DataLoader): The data loader for validation dataset.
-    scaler (torch.cuda.amp.autocast.Autocast): Optional scaler for using automatic mixed precision (AMP).
-
-    Returns:
-    dict: A dictionary containing the validation loss, accuracy, F1 scores, and F1 score macro.
-
-    """
     model.eval()
     val_loss = []
-    y_pred, y_true = [], []
+    valid_bs = valid_loader.batch_size
+    # note that it's okay to do len(loader) * bs, since drop_last=True is enabled
+    y_pred, y_true = np.zeros(len(valid_loader)*valid_bs), np.zeros(len(valid_loader)*valid_bs)
+    correct_samples = 0
 
-    for data, target in valid_loader:
+    for batch_i, (data, target) in enumerate(valid_loader):
         with torch.no_grad():
             data, target = data.cuda(), target.cuda()
             if scaler:
                 with torch.cuda.amp.autocast():
                     output = model(data)
+                    if criterion:
+                        loss = criterion(output, target)
+                        val_loss.append(loss.item())
             else:
                 output = model(data)
+                if criterion:
+                    loss = criterion(output, target)
+                    val_loss.append(loss.item())
 
-            if criterion:
-                loss = criterion(output, target)
-                val_loss.append(loss.item())
-
-            pred = output.argmax(dim=1)
-            y_pred.extend(pred.cpu().numpy())
-            y_true.extend(target.cpu().numpy())
+            correct_samples += (
+                target.detach().cpu().numpy() == np.argmax(output.detach().cpu().numpy(), axis=1)
+            ).sum()
+            y_pred[batch_i * valid_bs : (batch_i + 1) * valid_bs] = np.argmax(output.detach().cpu().numpy(), axis=1)
+            y_true[batch_i * valid_bs : (batch_i + 1) * valid_bs] = target.detach().cpu().numpy()
 
             del data, target, output
             torch.cuda.empty_cache()
@@ -456,10 +523,57 @@ def validation_ce(model, criterion, valid_loader, scaler):
     valid_loss = np.mean(val_loss)
     f1_scores = f1_score(y_true, y_pred, average=None)
     f1_score_macro = f1_score(y_true, y_pred, average='macro')
-    acc_score = accuracy_score(y_true, y_pred)
+    accuracy_score = correct_samples / (len(valid_loader)*valid_bs)
 
-    metrics = {"loss": valid_loss, "accuracy": acc_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
+    metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
     return metrics
+
+
+# def validation_ce(model, criterion, valid_loader, scaler):
+#     """
+#     Validates the given model with cross entropy loss and calculates several evaluation metrics such as accuracy, F1 scores and F1 score macro.
+
+#     Parameters:
+#     model (torch.nn.Module): The model to be validated.
+#     criterion (torch.nn.modules.loss._Loss): The criterion to be used for validation, which is cross entropy loss in this case.
+#     valid_loader (torch.utils.data.DataLoader): The data loader for validation dataset.
+#     scaler (torch.cuda.amp.autocast.Autocast): Optional scaler for using automatic mixed precision (AMP).
+
+#     Returns:
+#     dict: A dictionary containing the validation loss, accuracy, F1 scores, and F1 score macro.
+
+#     """
+#     model.eval()
+#     val_loss = []
+#     y_pred, y_true = [], []
+
+#     for data, target in valid_loader:
+#         with torch.no_grad():
+#             data, target = data.cuda(), target.cuda()
+#             if scaler:
+#                 with torch.cuda.amp.autocast():
+#                     output = model(data)
+#             else:
+#                 output = model(data)
+
+#             if criterion:
+#                 loss = criterion(output, target)
+#                 val_loss.append(loss.item())
+
+#             pred = output.argmax(dim=1)
+#             y_pred.extend(pred.cpu().numpy())
+#             y_true.extend(target.cpu().numpy())
+
+#             del data, target, output
+#             torch.cuda.empty_cache()
+
+#     valid_loss = np.mean(val_loss)
+#     f1_scores = f1_score(y_true, y_pred, average=None)
+#     f1_score_macro = f1_score(y_true, y_pred, average='macro')
+#     acc_score = accuracy_score(y_true, y_pred)
+
+#     metrics = {"loss": valid_loss, "accuracy": acc_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
+#     return metrics
 
 
 def copy_parameters_from_model(model):

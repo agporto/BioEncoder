@@ -154,7 +154,13 @@ class GuidedBackpropReLU(Function):
     def forward(self, input_img):
         """
         The forward pass method of the activation function.
+  Cell In[303], line 1
+    class_names = os.list.dir(os.path.join(root_dir, "data", run_name))
 
+AttributeError: module 'os' has no attribute 'list'
+
+
+In 
         Args:
             input_img (torch.Tensor): input image tensor.
 
