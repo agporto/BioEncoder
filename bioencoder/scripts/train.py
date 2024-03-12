@@ -75,8 +75,8 @@ def train(
 
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
-    log_dir = os.path.join(root_dir, "logs", run_name)
-    run_dir = os.path.join(root_dir, "runs", run_name, f"{run_name}_{stage}")
+    log_dir = os.path.join(root_dir, "logs", run_name, stage)
+    run_dir = os.path.join(root_dir, "runs", run_name, stage)
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
     for directory in [log_dir, run_dir, weights_dir]:
         if os.path.exists(directory) and overwrite==True:
