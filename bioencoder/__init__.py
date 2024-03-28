@@ -11,5 +11,5 @@ from .scripts.lr_finder import lr_finder
 from .scripts.interactive_plots import interactive_plots
 from .scripts.model_explorer_wrapper import model_explorer_wrapper as model_explorer
 
-import importlib.metadata
-__version__ = importlib.metadata.version("bioencoder")
+from importlib.metadata import version
+__version__ = version("bioencoder")

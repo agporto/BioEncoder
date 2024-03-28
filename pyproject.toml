@@ -8,11 +8,12 @@ authors = [
     {name = "Arthur Porto", email = "agporto@gmail.com"},
 	{name = "Moritz Lürig", email = "moritz.luerig@gmail.com"},
 	]
-description = "A tool for imageomics"
+description = "A metric learning toolkit"
 readme = "README.md"
 requires-python = "==3.9.*"
 keywords = ["metric learning", "biology"]
-dynamic = ["dependencies", "version"]
+dynamic = ["dependencies"]
+version = "0.1.1"
 
 [project.urls]
 "Homepage" = "https://github.com/agporto/BioEncoder"
@@ -32,4 +33,4 @@ where = ["."]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-version = {attr = "bioencoder.__version__"}
+	
