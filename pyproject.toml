@@ -12,8 +12,7 @@ description = "A tool for imageomics"
 readme = "README.md"
 requires-python = "==3.9.*"
 keywords = ["metric learning", "biology"]
-dynamic = ["dependencies"]
-version = "0.1.0"
+dynamic = ["dependencies", "version"]
 
 [project.urls]
 "Homepage" = "https://github.com/agporto/BioEncoder"
@@ -33,6 +32,4 @@ where = ["."]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-
-[tool.setuptools.package-data]
-assets = ["*.png"]
+version = {attr = "bioencoder.__version__"}
