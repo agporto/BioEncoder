@@ -14,7 +14,7 @@ def interactive_plots(
         overwrite=False,
         **kwargs,
 ):
-    
+
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
@@ -25,7 +25,6 @@ def interactive_plots(
     
     ## parse config
     backbone = hyperparams["model"]["backbone"]
-    num_classes = hyperparams["model"]["num_classes"]
     stage = hyperparams["model"]["stage"]
     batch_sizes = {
         "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
@@ -33,6 +32,12 @@ def interactive_plots(
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
     color_classes = hyperparams.get("color_classes")
+
+    ## manage second stage
+    if stage == "second":
+        num_classes = hyperparams["model"]["num_classes"]
+    else:
+        num_classes = None
 
     ## set cuda device
     cuda_device = kwargs.get("cuda_device",0)

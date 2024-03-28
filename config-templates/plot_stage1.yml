@@ -1,0 +1,18 @@
+model:
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
+  num_classes:
+  stage: 'first'
+
+dataloaders:
+  train_batch_size: 2 # Make sure your validation set is a multiple of this number
+  valid_batch_size: 2
+  num_workers: 32 
+
+img_size: 384
+
+color_classes: 
+  infuscans: "#FFD467"
+  androchrome: "#4DC9F2"
+  infuscans-obsoleta: "#F28D7A"
+  male: "#0F96C7"
+  

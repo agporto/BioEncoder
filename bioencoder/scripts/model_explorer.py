@@ -79,7 +79,7 @@ def model_explorer(
     st.set_page_config(page_title="BioEncoder Model Visualizer", layout="wide")
 
     # Sidebar    
-    img_path = "https://github.com/agporto/BioEncoder/blob/ae04b88d569b767a688447136cef17dbf4be8c40/images/logo.png?raw=true"
+    img_path = "https://github.com/agporto/BioEncoder/raw/main/assets/bioencoder_logo.png"
     st.sidebar.image(img_path, use_column_width=True)
     st.sidebar.title("BioEncoder Model Explorer")
 

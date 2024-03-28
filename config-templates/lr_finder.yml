@@ -1,0 +1,17 @@
+model:
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
+  num_classes: 4
+
+dataloaders:
+  train_batch_size: 50 # the higher - the better
+  valid_batch_size: 50
+  num_workers: 32 # set this to num of threads in your CPU
+
+optimizer:
+  name: SGD
+  params:
+    lr: 0.001
+
+criterion:
+  name: 'CrossEntropy'
+

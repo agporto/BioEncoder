@@ -40,7 +40,6 @@ def swa(
     
     ## parse config
     backbone = hyperparams["model"]["backbone"]
-    num_classes = hyperparams["model"]["num_classes"]
     top_k_checkoints = hyperparams["model"]["top_k_checkpoints"]
     amp = hyperparams["train"]["amp"]
     stage = hyperparams["train"]["stage"]
@@ -49,7 +48,13 @@ def swa(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-    
+
+    ## manage second stage
+    if stage == "second":
+        num_classes = hyperparams["model"]["num_classes"]
+    else:
+        num_classes = None
+        
     ## set directories
     data_dir = os.path.join(root_dir, "data", run_name)
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)

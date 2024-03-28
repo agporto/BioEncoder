@@ -56,7 +56,6 @@ def train(
 
     ## parse config
     backbone = hyperparams["model"]["backbone"]
-    num_classes = hyperparams["model"]["num_classes"]
     amp = hyperparams["train"]["amp"]
     ema = hyperparams["train"]["ema"]
     ema_decay_per_epoch = hyperparams["train"]["ema_decay_per_epoch"]
@@ -71,7 +70,6 @@ def train(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-    ckpt_pretrained = hyperparams["model"]["ckpt_pretrained"]
 
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
@@ -118,6 +116,9 @@ def train(
     
     ## manage second stage
     if stage == "second":
+
+        ## number of classes
+        num_classes = hyperparams["model"]["num_classes"]
         
         ## add learning rate
         if not "params" in optimizer_params:
@@ -137,8 +138,9 @@ def train(
         ## fetch checkpoints from first stage
         ckpt_pretrained = os.path.join(root_dir, "weights", run_name, 'first', "swa") 
     else: 
-    	ckpt_pretrained = None   
-    
+        ckpt_pretrained = None   
+        num_classes = None
+
     ## add hyperparams to log
     logger.info(utils.pprint_fill_hbar(f"Training {stage} stage ", symbol="#"))
     logger.info(f"Dataset:\n{pretty_repr(data_stats)}")
