@@ -60,11 +60,12 @@ You will get something like this:
 
 ```
 BioEncoder config:
-- root_dir: bioencoder
-- root_dir_abs: D:\temp\bioencoder-test\bioencoder
-- run_name: damselflies-example
-Given your Python WD (D:\temp\bioencoder-test), the current BioEncoder run directory will be:
-- D:\temp\bioencoder-test\bioencoder\damselflies-example
+- root_dir: bioencoder_wd
+- root_dir_abs: /home/mlurig/temp/bioencoder_wd
+- run_name: v1
+Given your Python WD (/home/mlurig/temp), the current BioEncoder run directory will be:
+- /home/mlurig/temp/bioencoder_wd/v1
+/home/mlurig/temp/bioencoder_wd does not exist but will be created when adding data!
 ```
 
 This will create a root folder inside your project, where all relevant bioencoder data, logs, etc. will be stored.
@@ -80,20 +81,15 @@ bioencoder.split_dataset(image_dir=r"~/Downloads/damselflies-aligned-trai_val", 
 You will get something like this:
 
 ```
-(bioencoder) D:\temp\bioencoder-test>bioencoder_split_dataset --image-dir data_raw\damselflies_aligned_resized
-Number of images per class prior to balancing: [1099, 481, 137, 2402]
-Minimum number of images per class: 137
-Number of images per class after balancing: [959, 481, 137, 959]
-0.1
-Number of images per class reserved for validation: 63
+Number of images per class prior to balancing: [2240, 147, 999, 5000] (8386 total)
+Minimum number of images per class: 147 * max ratio 6 = 882 max per class
+Number of images per class after balancing: [882, 147, 882, 882] (2793 total)
+Mode "flat": 279 validation images in total, min. 69 per class - processing:
+
 Processing class androchrome...
-Warning: androchrome contains more than 959 images. Only 959 images will be used.
-Processing class infuscans...
 Processing class infuscans-obsoleta...
+Processing class infuscans...
 Processing class male...
-Warning: male contains more than 959 images. Only 959 images will be used.
 ```
 
-
-
-
+Use the option `dry_run=True`if you want to experiment with different split modes or max ratios without actually doing the split. 
