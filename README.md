@@ -56,7 +56,7 @@ bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage1.yml")
 bioencoder.lr_finder(config_path=r"bioencoder_configs/lr_finder.yml")
 
 ## train stage 2
-bioencoder.train(config_path=r"bioencoder_configs/train_stage2.yml", overwrite=True)
+bioencoder.train(config_path=r"bioencoder_configs/train_stage2.yml")
 bioencoder.swa(config_path=r"bioencoder_configs/swa_stage2.yml")
 
 ## explore model from stage 2
