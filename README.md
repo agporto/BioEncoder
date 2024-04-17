@@ -73,12 +73,17 @@ bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
 Please cite BioEncoder as follows:
 
 ```bibtex
-@UNPUBLISHED{
-    Lurig2024-pb,
-    title     = "BioEncoder: a metric learning toolkit for comparative organismal biology",
-    author    = "L{\"u}rig, Moritz D and Di Martino, Emanuela and Porto, Arthur", 
-    journal  = "bioRxiv",
-    language  = "en",
-    doi       = "xxxx"
+
+@UNPUBLISHED{Luerig2024-ov,
+  title    = "{BioEncoder}: a metric learning toolkit for comparative
+              organismal biology",
+  author   = "Luerig, Moritz D and Di Martino, Emanuela and Porto, Arthur",
+  journal  = "bioRxiv",
+  pages    = "2024.04.03.587987",
+  month    =  apr,
+  year     =  2024,
+  language = "en",
+  doi      = "10.1101/2024.04.03.587987"
 }
+
 ```
