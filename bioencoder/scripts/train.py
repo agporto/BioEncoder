@@ -24,25 +24,38 @@ def train(
     **kwargs,
 ):
     """
-    
+    Trains the BioEncoder model based on the provided configuration settings in the yaml files.
 
     Parameters
     ----------
-    config_path : TYPE
-        DESCRIPTION.
-    overwrite : TYPE
-        DESCRIPTION.
-    **kwargs : TYPE
-        DESCRIPTION.
+    config_path : str
+        Path to the YAML configuration file that specifies detailed training and optimizer parameters.
+        This file controls various aspects of the training process including but not limited to model architecture,
+        optimizer settings, scheduler details, and data augmentation strategies.
+    overwrite : bool, optional
+        If True, existing directories for logs, runs, and weights will be removed and recreated, allowing for a clean training start.
+        If False, the training process will append to existing directories and files, which could lead to mixed results if not managed properly.
+        Default is False.
 
     Raises
     ------
+    FileNotFoundError
+        If the configuration file specified by `config_path` does not exist.
+    AssertionError
+        If certain conditions in the configuration (like minimum image count per class) are not met.
     ValueError
-        DESCRIPTION.
+        If incompatible or inconsistent parameters are detected during the setup or training processes.
 
-    Returns
-    -------
-    None.
+    Notes
+    -----
+    There are two separate files for the first and second stage - make sure you set them up appropriately. E.g., for stage two,
+    specify the number of classes, and a different learning rate.
+
+    Examples
+    --------
+    To start a new training session with overwriting previous outputs:
+        bioencoder.train("/path/to/config.yaml", overwrite=True)
+
 
     """
     
@@ -145,10 +158,6 @@ def train(
     logger.info(utils.pprint_fill_hbar(f"Training {stage} stage ", symbol="#"))
     logger.info(f"Dataset:\n{pretty_repr(data_stats)}")
     logger.info(f"Hyperparameters:\n{pretty_repr(hyperparams)}")
-
-    # ## set cuda device
-    # torch.cuda.set_device(cuda_device)
-    # print(f"Using CUDA device {cuda_device}")
     
     ## scaler
     scaler = torch.cuda.amp.GradScaler()
@@ -173,10 +182,20 @@ def train(
         ckpt_pretrained=ckpt_pretrained,
     ).cuda()
     
-    ## configure multi-GPU system
-    #if torch.cuda.device_count() > 1:
-    #    print("Let's use", torch.cuda.device_count(), "GPUs!")
-    #    model = torch.nn.DataParallel(model)   feedback
+    logger.info(f"Using backbone: {backbone}")
+    
+    ## configure GPU 
+    assert torch.cuda.device_count() > 0, "No GPUs detected on this System (check your CUDA setup) - aborting."
+    if torch.cuda.device_count() == 1:
+        logger.info(f"Found one GPU: {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+    else:
+        logger.info(f"Found {torch.cuda.device_count()} GPUs, but unfortunately multi-GPU use isn't implemented yet.")
+        logger.info(f"Using GPU {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+        
+        # ## set cuda device
+        # torch.cuda.set_device(cuda_device)
+        # print(f"Using CUDA device {cuda_device}")
+        # model = torch.nn.DataParallel(model)   
 
     ## configure optimizer
     optim = utils.build_optim(
@@ -244,30 +263,30 @@ def train(
             model.use_projection_head(True)
             #model_copy.use_projection_head(True)
             
-            logger.info(
-                "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
-                    epoch,
-                    end_training_time - start_training_time,
-                    time.time() - start_validation_time,
-                    train_metrics["loss"],
-                    pretty_repr(valid_metrics_projection_head),
-                    pretty_repr(valid_metrics_encoder),
-                )
+            ## epoch summary
+            message = "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
+                epoch,
+                end_training_time - start_training_time,
+                time.time() - start_validation_time,
+                train_metrics["loss"],
+                pretty_repr(valid_metrics_projection_head),
+                pretty_repr(valid_metrics_encoder),
             )
+            logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
             valid_metrics = valid_metrics_projection_head
         else:
             valid_metrics = utils.validation_ce(
                 model, criterion, loaders["valid_loader"], scaler
             )
-            logger.info(
-                "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
+            ## epoch summary
+            message =  "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
                     epoch,
                     end_training_time - start_training_time,
                     time.time() - start_validation_time,
                     train_metrics["loss"],
                     pretty_repr(valid_metrics),
-                )
             )
+            logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
 
         # write train and valid metrics to the logs
         utils.add_to_tensorboard_logs(
@@ -319,14 +338,12 @@ def train(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config-path",
-        type=str,
-    )
+    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file that specifies detailed training and optimizer parameters.")
+    parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
     
-    train(args.config_path)
-
+    train(args.config_path,
+          overwrite=args.overwrite)
 
 
 if __name__ == "__main__":

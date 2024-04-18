@@ -28,7 +28,6 @@ def create_encoder(backbone:str):
     try:
         if 'timm_' in backbone:
             backbone = backbone[5:]
-            print(f"Using backbone: {backbone}")
             model = timm.create_model(model_name=backbone, pretrained=True)
         else:
             model = BACKBONES[backbone](pretrained=True)
@@ -50,22 +49,24 @@ def create_encoder(backbone:str):
     return model, features_dim
 
 
-class SupConModel(nn.Module):
+class BioEncoderModel(nn.Module):
     """
-    This class implements the supervised contrastive learning model.
+    This class implements the BioEncoder model based on supervised contrastive learning.
     The model consists of a feature encoder and either a classifier head for the second stage of 
     training or a projection head for the first stage of training.
 
-    Parameters:
-    backbone (str): Name of the backbone network to use for the feature encoder.
-    projection_dim (int): Number of dimensions for the output of the projection head.
-    second_stage (bool): Whether to use the classifier head for second stage of training.
-    num_classes (int): Number of classes for the classification task, required if `second_stage` is True.
+    Parameters
+    ----------
+    backbone : str 
+        Name of the backbone network to use for the feature encoder.
+        projection_dim (int): Number of dimensions for the output of the projection head.
+        second_stage (bool): Whether to use the classifier head for second stage of training.
+        num_classes (int): Number of classes for the classification task, required if `second_stage` is True.
 
 
     """
     def __init__(self, backbone='resnet50', projection_dim=128, second_stage=False, num_classes=None):
-        super(SupConModel, self).__init__()
+        super(BioEncoderModel, self).__init__()
         self.encoder, self.features_dim = create_encoder(backbone)
         self.second_stage = second_stage
         self.projection_head = True

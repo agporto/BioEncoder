@@ -19,22 +19,42 @@ def lr_finder(
         **kwargs,
 ):
     """
-    
+    Conducts a learning rate range test using the LRFinder to identify an optimal 
+    learning rate for training a model. This function loads model configurations,
+    initializes the model, performs the test, plots the results, and updates the 
+    global configuration with the found learning rate.
 
     Parameters
     ----------
-    config_path : TYPE
-        DESCRIPTION.
-    overwrite : TYPE, optional
-        DESCRIPTION. The default is False.
-    **kwargs : TYPE
-        DESCRIPTION.
+    config_path : str
+        Path to the YAML file that contains the model and training configurations.
+        This configuration specifies details such as model architecture, data loader 
+        parameters, optimizer settings, and other hyperparameters necessary for training.
+    overwrite : bool, optional
+        If True, the generated plot will overwrite any existing file with the same name.
+        If False, the function will assert the nonexistence of the file before saving the plot.
+        Default is False.
 
-    Returns
-    -------
-    None.
+    Raises
+    ------
+    AssertionError
+        If 'overwrite' is False and a plot file with the intended name already exists.
+    FileNotFoundError
+        If the specified configuration file does not exist or is unreachable.
 
+    Examples
+    --------
+    To run the learning rate finder with a specific configuration and enable overwriting
+    of existing plots:
+        bioencoder.lr_finder("/path/to/config.yaml", overwrite=True)
+
+    Notes
+    -----
+    This function should be used with care, as the detected learning rates are not always at 
+    the global, but only the local minimum for a range of losses. Best inspect the plot, 
+    pick a suitable LR yourself, and supply it through the config file for stage 2.
     """
+    
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
@@ -87,7 +107,7 @@ def lr_finder(
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
     )
-    criterion, optimizer, scheduler = (
+    criterion, optimizer, _ = (
         optim["criterion"],
         optim["optimizer"],
         optim["scheduler"],
@@ -113,13 +133,11 @@ def lr_finder(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config-path",
-        type=str,
-    )
+    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for the LR finder.")
+    parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
-    
-    lr_finder(args.config_path)
+
+    lr_finder(args.config_path, overwrite=args.overwrite)
 
 
 if __name__ == "__main__":

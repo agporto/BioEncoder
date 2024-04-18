@@ -16,20 +16,28 @@ def swa(
     **kwargs,
 ):
     """
-    
+    Applies Stochastic Weight Averaging (SWA) to improve model generalization by averaging multiple model checkpoints.
 
     Parameters
     ----------
-    config_path : TYPE
-        DESCRIPTION.
-    **kwargs : TYPE
-        DESCRIPTION.
+    config_path : str
+        Path to the YAML file containing training configurations including model, training parameters, 
+        and data loader settings. This file dictates how the model and training processes should be structured.
 
-    Returns
-    -------
-    None.
+    Raises
+    ------
+    FileNotFoundError
+        If the specified configuration file or model checkpoints are not found.
+    ValueError
+        If required configurations for stages or model details are missing or invalid.
+
+    Examples
+    --------
+    To perform SWA on a model using a configuration file located at '/path/to/config.yaml':
+        bioencoder.swa("/path/to/config.yaml")
 
     """
+    
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
@@ -117,14 +125,11 @@ def swa(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config-path",
-        type=str,
-        default=None,
-    )
+    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for SWA.")
+    parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 
-    swa(args.config_path)
+    swa(args.config_path, overwrite=args.overwrite)
     
     
     

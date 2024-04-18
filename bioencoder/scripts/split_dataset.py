@@ -23,36 +23,60 @@ def split_dataset(
         ):
 
     """
-    Split input dataset into a training set and a validation set.
+    Splits a dataset of images into training and validation subsets based on the specified criteria.
+    This function is designed to operate on datasets organized into class-specific subfolders within a given directory.
 
     Parameters
     ----------
     image_dir : str
-        path images (already sorted into class specific sub-folders).
+        Path to the directory containing subfolders of images, where each subfolder represents a class.
     mode : str, optional
-        type of split:
-            - "flat":
-            - "random": 
-            - "fixed": 
+        Specifies the strategy for splitting the dataset:
+            - "flat": Calculating split to the most abundant class (after applying max_ratio), and then applying it to all classes 
+            - "random": Randomly selects images across all classes to form the validation set, disregarding class balance.
+            - "fixed": Ensures each class contributes a fixed proportion to the validation set, based on `val_percent`.
+        Default is "flat".
     val_percent : float, optional
-        train/valitation split. The default is 0.1.
+        Proportion of the dataset to allocate to the validation set, expressed as a decimal.
+        Default is 0.1 (10%).
     max_ratio : int, optional
-        The maximium ratio between the least and most abdundant class. Images 
-        in the most abundant class beyond this ratio will be excluded by random 
-        selection. The default is 7.
-    min_per_class : TYPE, optional
-        DESCRIPTION. The default is 20.
-    dry_run : TYPE, optional
-        DESCRIPTION. The default is False.
-    overwrite : TYPE, optional
-        DESCRIPTION. The default is False.
+        Maximum allowed ratio between the most and least abundant classes in the dataset. Excess images in larger classes are randomly discarded to adhere to this ratio.
+        Default is 7.
+    min_per_class : int, optional
+        Minimum number of images required in each class to perform the split. If any class has fewer images, an error is raised.
+        Default is 20.
     random_seed : int, optional
-        Random seed for the selection of the training and validation images. 
-        The default is 42.
+        Seed for the random number generator to ensure reproducibility in splits.
+        Default is 42.
+    dry_run : bool, optional
+        If True, performs a trial run where the split is simulated but no files are actually moved or copied.
+        Default is False.
+    overwrite : bool, optional
+        If True, allows the function to overwrite existing directories and files in the target split directories. If False, the function will not overwrite any files and will raise an error if file conflicts exist.
+        Default is False.
+    **kwargs : dict, optional
+        Additional keyword arguments for extending function functionality or providing configurations, such as paths to configuration files.
+        
+    Raises
+    ------
+    AssertionError
+        If any class contains fewer images than `min_per_class`, or if the directory structure is not as expected.
+    IOError
+        If `overwrite` is False and target directories for the split already exist.
 
-    Returns
-    -------
-    None.
+    Notes
+    -----
+    The dataset directory structure should follow this pattern:
+        /path/to/dataset/
+            /class1/
+            /class2/
+            ...
+
+    Examples
+    --------
+    This would simulate (dry_run=True) a random split where 15% of the total images are allocated to the validation set,
+    and sampling randomly acrosss all classes (mode="random"):
+        bioencoder.split_dataset("/path/to/dataset", mode="random", val_percent=0.15, dry_run=True)
 
     """
     
@@ -123,7 +147,7 @@ def split_dataset(
                     for image_name in image_set:
                         shutil.copy(os.path.join(class_dir, image_name), dest_dir)
                 
-    if mode == "random":
+    elif mode == "random":
 
         ## feedback
         n_images_val = int(sum(all_n_images_balanced) * val_percent)
@@ -178,28 +202,26 @@ def split_dataset(
 def cli():
        
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--image-dir", 
-        type=str, 
-        help="path to the image directory"
-    )
-    parser.add_argument(
-        "--val-percent",
-        type=float,
-        help="percentage of images to be retained for validation (default=0.1)",
-        default=0.1,
-    )
-    parser.add_argument(
-        "--ratio",
-        type=float,
-        help="maximum ratio between the number of images in the most common class and the least commong one",
-        default=7,
-    )
+    parser.add_argument("--image-dir", type=str, help="Path to the images directory sorted into class-specific subfolders.")
+    parser.add_argument("--mode", type=str, choices=['flat', 'random', 'fixed'], default='flat', help="Type of dataset split to perform.")
+    parser.add_argument("--val_percent", type=float, default=0.1, help="Percentage of data to use as validation set.")
+    parser.add_argument("--max_ratio", type=int, default=7, help="Maximum ratio between the most and least abundant classes.")
+    parser.add_argument("--min_per_class", type=int, default=20, help="Minimum number of images per class.")
+    parser.add_argument("--random_seed", type=int, default=42, help="Seed for random number generator.")
+    parser.add_argument("--dry_run", action='store_true', help="Run without making any changes.")
+    parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
     
-    split_dataset(args.image_dir, args.val_percent, args.ratio)
-
-
+    split_dataset(
+         args.image_dir, 
+         mode=args.mode,
+         val_percent=args.val_percent,
+         max_ratio=args.max_ratio,
+         min_per_class=args.min_per_class,
+         random_seed=args.random_seed,
+         dry_run=args.dry_run,
+         overwrite=args.overwrite,
+     )
 
 if __name__ == "__main__":
     
