@@ -6,6 +6,8 @@
 
 BioEncoder is a tool box for image classification and trait discovery in organismal biology. It relies on image classification models trained using metric learning to learn species trait data  (i.e., features) from images. This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). 
 
+Preprint on BioRxiv: [https://doi.org/10.1101/2024.04.03.587987]( https://doi.org/10.1101/2024.04.03.587987)
+
 ## Features
 - Taxon-agnostic dataloaders (making it applicable to any dataset - not just biological ones)
 - Support of [timm models](https://github.com/rwightman/pytorch-image-models), and [pytorch-optimizer](https://github.com/jettify/pytorch-optimizer)
