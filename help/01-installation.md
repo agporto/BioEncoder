@@ -1,6 +1,8 @@
 # Installation
 
-This example uses [mamba](https://github.com/conda-forge/miniforge), but conda will just work fine.  
+This example uses [mamba](https://github.com/conda-forge/miniforge), but conda will work just fine.  
+
+Steps 2 and 3 give you more fine control over which CUDA and matching pytorch version to use. 
 
 1\. Create a clean virtual environment 
 ```
