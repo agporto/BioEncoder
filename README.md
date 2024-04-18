@@ -42,7 +42,7 @@ This archive contains the images and configuration files needed for step 3/4, as
 import bioencoder
 
 ## global setup
-bioencoder.configure(root_dir=r"bioencoder_wd", run_name="v1")
+bioencoder.configure(root_dir=r"~/bioencoder_wd", run_name="v1")
 
 ## split dataset
 bioencoder.split_dataset(image_dir=r"~/Downloads/damselflies-aligned-trai_val", max_ratio=6, random_seed=42)
@@ -71,7 +71,7 @@ bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
 ```python
 ## use the flag "--overwrite" to redo a step
 
-bioencoder_configure --root-dir bioencoder_wd --run-name v1
+bioencoder_configure --root-dir "~/bioencoder_wd" --run-name v1
 bioencoder_split_dataset --image-dir "~/Downloads/damselflies-aligned-trai_val" --max-ratio 6 --random-seed 42
 bioencoder_train --config-path "bioencoder_configs/train_stage1.yml"
 bioencoder_swa --config-path "bioencoder_configs/swa_stage1.yml"
