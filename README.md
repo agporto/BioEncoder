@@ -12,7 +12,7 @@ BioEncoder is a tool box for image classification and trait discovery in organis
 - Access to state-of-the-art metric losses, such as [Supcon](https://arxiv.org/abs/2004.11362) and  [Sub-center ArcFace](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123560715.pdf).
 - [Exponential Moving Average](https://github.com/fadel/pytorch_ema) for stable training, and Stochastic Moving Average for better generalization and performance.
 - [LRFinder](https://github.com/davidtvs/pytorch-lr-finder) for the second stage of the training.
-- Easy customization of hyperparameters, including augmentations, through `YAML` configs
+- Easy customization of hyperparameters, including augmentations, through `YAML` configs (check the [config-templates](config-templates) folder for examples)
 - Custom augmentations techniques via [albumentations](https://github.com/albumentations-team/albumentations)
 - TensorBoard logs and checkpoints (soon to come: WandB integration)
 - Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391))
@@ -31,15 +31,14 @@ BioEncoder is a tool box for image classification and trait discovery in organis
 pip install bioencoder
 ````
 
-2\. Download example dataset from the data repo: [https://zenodo.org/records/10909614/files/BioEncoder-data.zip](https://zenodo.org/records/10909614/files/BioEncoder-data.zip?download=1&preview=1)
-
-```
-# this archive contains the images and configuration files needed for step 3, as well as the final model checkpoints and a script to reproduce the results and figures presented in the paper.
-```
+2\. Download example dataset from the data repo: [https://zenodo.org/records/10909614/files/BioEncoder-data.zip](https://zenodo.org/records/10909614/files/BioEncoder-data.zip?download=1&preview=1). 
+This archive contains the images and configuration files needed for step 3/4, as well as the final model checkpoints and a script to reproduce the results and figures presented in the paper. To play around with theinteractive figures and the model explorer you can also skip the training / SWA steps. 
 
 3\. Start interactive session (e.g., in Spyder or VS code) and run the following commands one by one:
 
 ```python
+## use "overwrite=True to redo a step
+
 import bioencoder
 
 ## global setup
@@ -70,6 +69,7 @@ bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
 4\. Alternatively, you can directly use the command line interface: 
 
 ```python
+## use the flag "--overwrite" to redo a step
 
 bioencoder_configure --root-dir bioencoder_wd --run-name v1
 bioencoder_split_dataset --image-dir "~/Downloads/damselflies-aligned-trai_val" --max-ratio 6 --random-seed 42
