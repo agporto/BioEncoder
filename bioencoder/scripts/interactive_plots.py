@@ -15,6 +15,38 @@ def interactive_plots(
         **kwargs,
 ):
 
+    """
+    Generates interactive plots for visualizing high-dimensional embeddings of validation set.
+    This function computes embeddings using a trained model, reduces their dimensionality,
+    and plots them in an interactive plot saved as an HTML file. Optionally, it can also return
+    embeddings data as a DataFrame (ret_embeddings=True).
+    
+    Parameters
+    ----------
+    config_path : str
+        Path to the YAML file that contains settings for the model and training configurations.
+        This configuration includes details on model architecture, data loaders, and other
+        hyperparameters required for embedding computation.
+    overwrite : bool, optional
+        If True, allows the generated HTML plot file to overwrite existing files with the same name.
+        If False, the function will check if the file exists and assert failure if it does. Default is False.
+    
+    
+    Raises
+    ------
+    AssertionError
+        If 'overwrite' is False and a plot file already exists at the specified location.
+    FileNotFoundError
+        If the configuration file does not exist.
+    
+    Examples
+    --------
+    To generate interactive plots for model embeddings:
+        bioencoder.interactive_plots("/path/to/config.yaml")
+    
+
+    """
+        
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
@@ -111,14 +143,11 @@ def interactive_plots(
 def cli():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config-path",
-        type=str,
-        default=None,
-    )
+    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
+    parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
-    
-    interactive_plots(args.config_path)
+
+    interactive_plots(args.config_path, overwrite=args.overwrite)
     
     
 

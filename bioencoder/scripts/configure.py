@@ -12,18 +12,31 @@ def configure(
         **kwargs
         ):
     """
-    
+    Configures and saves settings for an application, storing them in a YAML file.
+    This function allows specifying a configuration file path and updates or creates
+    configuration settings based on the provided keyword arguments. If no configuration
+    file is specified, it defaults to a '.bioencoder' file in the user's home directory.
 
     Parameters
     ----------
-    config_path : TYPE, optional
-        DESCRIPTION. The default is None.
-    **kwargs : TYPE
-        DESCRIPTION.
+    config_path : str, optional
+        Path to the YAML configuration file where settings are to be saved. If not specified,
+        defaults to ~/.bioencoder. If the file does not exist, it will be created.
 
-    Returns
-    -------
-    None.
+    Raises
+    ------
+    IOError
+        If there are issues reading from or writing to the configuration file.
+
+    Examples
+    --------
+    To create or update a configuration with a specific root directory and run name:
+
+        configure(root_dir="/path/to/data", run_name="experiment1")
+
+    This will update the default configuration file with the specified `root_dir` and `run_name`,
+    and print out the full path where the run directory will be located based on the current
+    working directory.
 
     """
     

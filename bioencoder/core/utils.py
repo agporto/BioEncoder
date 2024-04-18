@@ -15,7 +15,7 @@ from sklearn.metrics import f1_score #, accuracy_score
 from .losses import LOSSES
 from .optimizers import OPTIMIZERS
 from .schedulers import SCHEDULERS
-from .models import SupConModel
+from .models import BioEncoderModel
 from .datasets import create_dataset
 from .augmentations import get_transforms
 
@@ -84,7 +84,7 @@ def set_seed(seed=42):
 
 
 def pprint_fill_hbar(message, symbol="-", ret=True):
-    terminal_width = os.get_terminal_size()[0]
+    terminal_width = os.get_terminal_size()[0] - len("%Y-%m-%d %H:%M:%S")
     message_length = len(message)
 
     if message_length >= terminal_width:
@@ -255,7 +255,7 @@ def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=
     - model (torch.nn.Module): The SupCon model.
     """
 
-    model = SupConModel(backbone=backbone, second_stage=second_stage, num_classes=num_classes)
+    model = BioEncoderModel(backbone=backbone, second_stage=second_stage, num_classes=num_classes)
 
     if ckpt_pretrained:
         model.load_state_dict(torch.load(ckpt_pretrained, map_location=torch.device(cuda_device))['model_state_dict'], strict=False)

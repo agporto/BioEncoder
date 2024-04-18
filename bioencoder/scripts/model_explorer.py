@@ -36,22 +36,31 @@ def model_explorer(
         **kwargs,
         ):
     """
-    
+    Launches a Streamlit-based web application to interactively explore different visualization
+    techniques of the BioEncoder model, such as filter visualizations, activation maps, 
+    saliency maps, Grad-CAM, and Contrastive-CAM. It provides a user interface to upload an 
+    image, select the visualization type, and dynamically adjust parameters related to each 
+    visualization technique.
 
     Parameters
     ----------
-    config_path : TYPE
-        DESCRIPTION.
-    **kwargs : TYPE
-        DESCRIPTION.
-     : TYPE
-        DESCRIPTION.
+    config_path : str
+        Path to the YAML configuration file that contains model specifications and settings, 
+        including backbone, number of classes, and stage-specific settings (e.g., 'first' or 
+        'second' stage of model training).
 
-    Returns
-    -------
-    None.
+    Raises
+    ------
+    FileNotFoundError
+        If the specified configuration file is not found or required model weights are unavailable.
+
+    Examples
+    --------
+    To start the model explorer from the command line using a specific configuration:
+        bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
 
     """
+    
     ## load bioencoer config
     config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
