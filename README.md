@@ -37,7 +37,7 @@ pip install bioencoder
 # this archive contains the images and configuration files needed for step 3, as well as the final model checkpoints and a script to reproduce the results and figures presented in the paper.
 ```
 
-3\. Start interactive session (e.g., in Spyder or VS code) and run:
+3\. Start interactive session (e.g., in Spyder or VS code) and run the following commands one by one:
 
 ```python
 import bioencoder
@@ -65,6 +65,22 @@ bioencoder.swa(config_path=r"bioencoder_configs/swa_stage2.yml")
 
 ## explore model from stage 2
 bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
+
+```
+4\. Alternatively, you can directly use the command line interface: 
+
+```python
+
+bioencoder_configure --root-dir bioencoder_wd --run-name v1
+bioencoder_split_dataset --image-dir "~/Downloads/damselflies-aligned-trai_val" --max-ratio 6 --random-seed 42
+bioencoder_train --config-path "bioencoder_configs/train_stage1.yml"
+bioencoder_swa --config-path "bioencoder_configs/swa_stage1.yml"
+bioencoder_interactive_plots --config-path "bioencoder_configs/plot_stage1.yml"
+bioencoder_model_explorer --config-path "bioencoder_configs/explore_stage1.yml"
+bioencoder_lr_finder --config-path "bioencoder_configs/lr_finder.yml"
+bioencoder_train --config-path "bioencoder_configs/train_stage2.yml"
+bioencoder_swa --config-path "bioencoder_configs/swa_stage2.yml"
+bioencoder_model_explorer --config-path "bioencoder_configs/explore_stage2.yml"
 
 ```
 
