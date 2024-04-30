@@ -1,7 +1,5 @@
 model:
   backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  ckpt_pretrained: 
-  num_classes: # in the first stage of training we don't need num_classes, since we don't have a FC head
 
 train:
   n_epochs: &epochs 100

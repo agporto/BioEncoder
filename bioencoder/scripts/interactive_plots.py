@@ -1,6 +1,7 @@
 import os
 import argparse
 import yaml
+import numpy as np
 import pandas as pd
 import torch
 
@@ -57,24 +58,16 @@ def interactive_plots(
     
     ## parse config
     backbone = hyperparams["model"]["backbone"]
-    stage = hyperparams["model"]["stage"]
+    num_classes = hyperparams["model"].get("num_classes", None)
+    checkpoint = hyperparams["model"].get("checkpoint", "swa")
+    stage = hyperparams["model"].get("stage", "first")
     batch_sizes = {
         "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-    color_classes = hyperparams.get("color_classes")
-
-    ## manage second stage
-    if stage == "second":
-        num_classes = hyperparams["model"]["num_classes"]
-    else:
-        num_classes = None
-
-    ## set cuda device
-    cuda_device = kwargs.get("cuda_device",0)
-    torch.cuda.set_device(cuda_device)
-    print(f"Using CUDA device {cuda_device}")
+    color_classes = hyperparams.get("color_classes", None)
+    color_map = hyperparams.get("color_map", "jet")
 
     ## init scaler
     scaler = torch.cuda.amp.GradScaler()
@@ -90,11 +83,13 @@ def interactive_plots(
         assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
     
     ## load weights
-    ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, "swa")
+    print(f"Checkpoint: using {checkpoint} of {stage} stage")
+    ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, checkpoint)
 
     ## set random seed
     utils.set_seed()
 
+    ## extract embeddings
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(
         data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second")
@@ -104,18 +99,17 @@ def interactive_plots(
         second_stage=(stage == "second"),
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
-        cuda_device=cuda_device,
     ).cuda()
     model.use_projection_head(False)
     model.eval()
-
     embeddings_train, labels_train = utils.compute_embeddings(
         loaders["valid_loader"], model, scaler
     )
     
-
+    ## load dataset
     paths_train = [item[0] for item in loaders["valid_loader"].dataset.imgs]
     
+    ## return embeddings without plotting
     if kwargs.get("ret_embeddings"):
         
         df = pd.DataFrame([os.path.basename(item) for item in paths_train], columns=["image_name"])
@@ -137,7 +131,11 @@ def interactive_plots(
         os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
     ]
     
-    helpers.bokeh_plot(df, out_path=plot_path, color_classes=color_classes)
+    ## check if color matches n classes
+    if color_classes:
+        assert len(np.unique(labels_train)) == len(color_classes), f"Number of classes is {len(np.unique(labels_train))}, but you only provided {len(color_classes)} colors"
+    
+    helpers.bokeh_plot(df, out_path=plot_path, color_map=color_map, color_classes=color_classes)
     
     
 def cli():

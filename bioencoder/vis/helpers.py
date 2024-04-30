@@ -234,7 +234,7 @@ def embbedings_dimension_reductions(data_table):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html', **kwargs):
+def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
 
@@ -272,14 +272,13 @@ def bokeh_plot(df, out_path='plot.html', **kwargs):
     df['image_files'] = filenames
     
     ## color management
-    color_classes = kwargs.get("color_classes")
-    if not color_classes.__class__.__name__ == "NoneType":
+    if color_classes:
         df_col = pd.DataFrame.from_dict(color_classes.items())
         df_col.columns = ["class_str","color"]
         df = df.merge(df_col)
     else:
         num_classes = len(df['class'].unique())
-        cmap=plt.cm.get_cmap("jet", num_classes)
+        cmap=plt.cm.get_cmap(color_map, num_classes)
         colors_raw = cmap((df['class']), bytes=True)
         colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
         df['color'] = colors_str

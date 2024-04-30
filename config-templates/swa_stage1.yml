@@ -1,6 +1,5 @@
 model:
   backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  num_classes:
   top_k_checkpoints: 3
 
 train:

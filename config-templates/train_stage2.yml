@@ -1,8 +1,7 @@
 model:
   backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  ckpt_pretrained: 
   num_classes: 4
-
+  
 train:
   n_epochs: &epochs 30
   amp: True # set this to True, if your GPU supports FP16. 2080Ti - okay, 1080Ti - not okay

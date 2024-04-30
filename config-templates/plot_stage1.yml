@@ -1,18 +1,22 @@
 model:
   backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  num_classes:
-  stage: 'first'
+  checkpoint: swa # default: "swa", otherwise specify a file in the weights folder (e.g., epoch98)
+  stage: first # default: "first"
 
 dataloaders:
   train_batch_size: 2 # Make sure your validation set is a multiple of this number
   valid_batch_size: 2
-  num_workers: 32 
+  num_workers: 32 ## shouldn't be higher than the number of cores in your CPU
 
 img_size: 384
 
-color_classes: 
+color_classes: # overrides color_map
   infuscans: "#FFD467"
   androchrome: "#4DC9F2"
   infuscans-obsoleta: "#F28D7A"
   male: "#0F96C7"
+
+color_map: 'Set1' # see https://matplotlib.org/stable/users/explain/colors/colormaps.html
+
+  
   
