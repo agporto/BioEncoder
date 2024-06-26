@@ -9,6 +9,7 @@ BioEncoder is a tool box for image classification and trait discovery in organis
 Preprint on BioRxiv: [https://doi.org/10.1101/2024.04.03.587987]( https://doi.org/10.1101/2024.04.03.587987)
 
 ## Features
+
 - Taxon-agnostic dataloaders (making it applicable to any dataset - not just biological ones)
 - Support of [timm models](https://github.com/rwightman/pytorch-image-models), and [pytorch-optimizer](https://github.com/jettify/pytorch-optimizer)
 - Access to state-of-the-art metric losses, such as [Supcon](https://arxiv.org/abs/2004.11362) and  [Sub-center ArcFace](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123560715.pdf).
