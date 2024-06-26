@@ -6,11 +6,13 @@ from torchvision import transforms
 from sklearn import decomposition, manifold
 import matplotlib.pyplot as plt
 from bokeh.models import (LassoSelectTool, PanTool,
-                          ResetTool,
+                          ResetTool, Div, CustomJS, 
                           HoverTool, WheelZoomTool)
 TOOLS = [LassoSelectTool, PanTool, WheelZoomTool, ResetTool]
 from bokeh.models import ColumnDataSource
 from bokeh import plotting as bplot
+from bokeh.io import show
+from bokeh import layouts
 
 
 def preprocess_image(img):
@@ -234,7 +236,8 @@ def embbedings_dimension_reductions(data_table):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, **kwargs):
+def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, plot_style=1, 
+               point_size=10, **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
 
@@ -254,22 +257,12 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, **
     if not all(col in df.columns for col in ['paths', 'class']):
         raise ValueError("The dataframe must have columns 'paths' and 'class'")
         
-    tooltip = """
-        <div>
-            <div>
-                <img
-                src="@image_files" height="192" alt="image"
-                style="float: left; margin: 0px 15px 15px 0px; image-rendering: pixelated;"
-                border="2"
-                ></img>
-            </div>
-            <div>
-                <span style="font-size: 17px;">@class_str</span>
-            </div>
-        </div>
-              """
-    filenames = df['paths']
-    df['image_files'] = filenames
+
+              
+
+       
+        
+    df['image_files'] =  df['paths']
     
     ## color management
     if color_classes:
@@ -285,14 +278,58 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, **
         
     source = ColumnDataSource(df)
     bplot.output_file(out_path)
-    hover0 = HoverTool(tooltips=tooltip)
-    hover1 = HoverTool(tooltips=tooltip)
-    tools0 = [t() for t in TOOLS] + [hover0]
-    tools1 = [t() for t in TOOLS] + [hover1]
-    pca = bplot.figure(tools=tools0)
-    pca.scatter('PC1', 'PC2', color='color', source=source, size=8)
-    tsne = bplot.figure(tools=tools1)
-    tsne.scatter('tSNE-0', 'tSNE-1', color='color', source=source, size=8)
-    p = bplot.gridplot([[pca, tsne]])
-    bplot.show(p)
+    
+    if plot_style == 1:
+        tooltip = """
+        <div>
+            <div>
+                <img
+                src="@image_files" height="192" alt="image"
+                style="float: left; margin: 0px 15px 15px 0px; image-rendering: pixelated;"
+                border="2"
+                ></img>
+            </div>
+            <div>
+                <span style="font-size: 17px;">@class_str</span>
+            </div>
+        </div>
+        """
+        hover0 = HoverTool(tooltips=tooltip)
+        hover1 = HoverTool(tooltips=tooltip)
+        tools0 = [t() for t in TOOLS] + [hover0]
+        tools1 = [t() for t in TOOLS] + [hover1]
+        pca = bplot.figure(tools=tools0)
+        pca.scatter('PC1', 'PC2', color='color', source=source, size=point_size)
+        tsne = bplot.figure(tools=tools1)
+        tsne.scatter('tSNE-0', 'tSNE-1', color='color', source=source, size=point_size)
+        p = bplot.gridplot([[pca, tsne]])
+        bplot.show(p)
+        
+    elif plot_style == 2:
+        div = Div(text="")
+        hover=HoverTool(
+                tooltips = [
+                ("class_str", "@class_str"),
+                ]
+        )
+        hover.callback = CustomJS(args=dict(div=div, ds=source), code="""
+            const hit_test_result = cb_data.index;
+            const indices = hit_test_result.indices;
+            if (indices.length > 0) {
+                div.text = `<img 
+                src="${ds.data['image_files'][indices[0]]}"
+                style="float: left; margin: 0px 15px 15px 0px; max-width: 650px; max-height: 650px; width: auto; height: auto;"
+                border="2"
+                />`;
+            }
+            """)
+        tools0 = [t() for t in TOOLS] + [hover]
+        tools1 = [t() for t in TOOLS] + [hover]
+        pca = bplot.figure(tools=tools0)
+        pca.scatter('PC1', 'PC2', color='color', source=source, size=point_size)
+        tsne = bplot.figure(tools=tools1)
+        tsne.scatter('tSNE-0', 'tSNE-1', color='color', source=source, size=point_size)
+        p = bplot.gridplot([[pca, tsne]])
+        show(layouts.row(p, div))
+
     return p

@@ -10,9 +10,8 @@ from pathlib import Path
 from bioencoder.core import utils
 from bioencoder.vis import helpers
 
-def interactive_plots(    
+def inference(    
         config_path, 
-        overwrite=False,
         **kwargs,
 ):
 
@@ -25,14 +24,10 @@ def interactive_plots(
     Parameters
     ----------
     config_path : str
-        Path to the YAML file that contains settings for the model and training configurations.
+        Path to the YAML file that contains settings for the model.
         This configuration includes details on model architecture, data loaders, and other
         hyperparameters required for embedding computation.
-    overwrite : bool, optional
-        If True, allows the generated HTML plot file to overwrite existing files with the same name.
-        If False, the function will check if the file exists and assert failure if it does. Default is False.
-    
-    
+
     Raises
     ------
     AssertionError
@@ -43,7 +38,7 @@ def interactive_plots(
     Examples
     --------
     To generate interactive plots for model embeddings:
-        bioencoder.interactive_plots("/path/to/config.yaml")
+        bioencoder.inference("/path/to/config.yaml")
     
 
     """

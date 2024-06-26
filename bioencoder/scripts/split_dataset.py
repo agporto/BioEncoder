@@ -131,8 +131,8 @@ def split_dataset(
 
             ## check min training imgs
             n_train_imgs = len(class_images_selection) - class_n_images_val
-            if n_train_imgs < 50:
-                print(f"Warning: {class_name} contains fewer than 50 images for training ({n_train_imgs}) - excluding this class!")
+            if n_train_imgs < min_per_class:
+                print(f"Warning: {class_name} contains fewer than the set min value per class ({min_per_class}) - excluding this class!")
                 continue
             if class_n_images_val > n_train_imgs :
                 print(f"Warning: {class_name} contains fewer images for training ({n_train_imgs}) than for validation ({class_n_images_val}) .")
