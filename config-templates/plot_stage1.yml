@@ -1,22 +1,24 @@
 model:
-  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  checkpoint: swa # default: "swa", otherwise specify a file in the weights folder (e.g., epoch98)
-  stage: first # default: "first"
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
+  checkpoint: swa # Checkpoint to load: "swa" for Stochastic Weight Averaging, or specify a file in the weights folder (e.g., epoch98)
+  stage: first # Training stage: 'first' for initial training, 'second' for fine-tuning
 
 dataloaders:
-  train_batch_size: 2 # Make sure your validation set is a multiple of this number
-  valid_batch_size: 2
-  num_workers: 32 ## shouldn't be higher than the number of cores in your CPU
+  train_batch_size: 2 # Batch size for training data; ensure validation set size is a multiple of this number
+  valid_batch_size: 2 # Batch size for validation data
+  num_workers: 32 # Number of CPU threads for data loading; should not exceed the number of CPU cores
 
-img_size: 384
+img_size: 384 # Image size for training and validation
+
+plot_style: 1 # (1: pictogram above point, 2: pictogram next to plot panel)
 
 color_classes: # overrides color_map
-  infuscans: "#FFD467"
-  androchrome: "#4DC9F2"
-  infuscans-obsoleta: "#F28D7A"
-  male: "#0F96C7"
+  #class1: "#FFD467"
+  #class2: "#4DC9F2"
 
-color_map: 'Set1' # see https://matplotlib.org/stable/users/explain/colors/colormaps.html
+point_size: 10  ## size of points in scatter plot
+
+color_map: 'Set1' # Default color map; see https://matplotlib.org/stable/users/explain/colors/colormaps.html for options
 
   
   

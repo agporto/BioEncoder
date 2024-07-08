@@ -11,7 +11,7 @@ from datetime import datetime
 import os
 import zipfile
 
-from bioencoder import utils
+from bioencoder import config, utils
 
 #%%
 
@@ -73,7 +73,6 @@ def archive(
     """
     
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
@@ -113,35 +112,25 @@ def archive(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data",
-        type=str,
-    )
-    parser.add_argument(
-        "--logs",
-        type=str,
-    )
-    parser.add_argument(
-        "--plots",
-        type=str,
-    )
-    parser.add_argument(
-        "--runs",
-        type=str,
-    )
-    parser.add_argument(
-        "--weights",
-        type=str,
-    )
-    parser.add_argument(
-        "--export-dir",
-        type=str,
-    )
+    parser.add_argument("--data", type=bool, default=False, help="Include the 'data' directory in the archive (default: False)")
+    parser.add_argument("--logs", type=bool, default=True, help="Include the 'logs' directory in the archive (default: True)")
+    parser.add_argument("--plots", type=bool, default=True, help="Include the 'plots' directory in the archive (default: True)")
+    parser.add_argument("--runs", type=bool, default=True, help="Include the 'runs' directory in the archive (default: True)")
+    parser.add_argument("--weights", type=bool, default=False, help="Include the 'weights' directory in the archive (default: False)")
+    parser.add_argument("--export-dir", type=str, help="Directory to save the zipped archive")
     args = parser.parse_args()
+
+    archive_cli = utils.restore_config(archive)
+    archive_cli(
+        data=args.data,
+        logs=args.logs,
+        plots=args.plots,
+        runs=args.runs,
+        weights=args.weights,
+        export_dir=args.export_dir
+    )
+
     
-    archive(args.config_path)
-
-
 if __name__ == "__main__":
     
     cli()

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+#%% imports
+
 import argparse
 import os
 from collections import OrderedDict
 
 import torch
 
-from bioencoder.core import utils
+from bioencoder import config, utils
 
-#%%
+#%% function
 
 def swa(
     config_path, 
@@ -39,10 +41,9 @@ def swa(
     """
     
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
-    
+        
     ## load config 
     hyperparams = utils.load_yaml(config_path)
     
@@ -125,14 +126,15 @@ def swa(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for SWA.")
+    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for SWA.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 
-    swa(args.config_path, overwrite=args.overwrite)
+
+    swa_cli = utils.restore_config(swa)    
+    swa_cli(args.config_path, overwrite=args.overwrite)
     
-    
-    
+
 if __name__ == "__main__":
     
     cli()

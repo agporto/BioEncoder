@@ -255,12 +255,7 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, pl
     """
     
     if not all(col in df.columns for col in ['paths', 'class']):
-        raise ValueError("The dataframe must have columns 'paths' and 'class'")
-        
-
-              
-
-       
+        raise ValueError("The dataframe must have columns 'paths' and 'class'")      
         
     df['image_files'] =  df['paths']
     

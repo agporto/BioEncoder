@@ -1,9 +1,9 @@
 import os
-import torchvision
+from torchvision.datasets import ImageFolder
 import numpy as np
 
 
-class BioDataset(torchvision.datasets.ImageFolder):
+class BioDataset(ImageFolder):
     """Custom dataset for bio images.
 
     This dataset inherits from `torchvision.datasets.ImageFolder` and adds a flag to indicate whether to
@@ -54,5 +54,6 @@ def create_dataset(data_dir, train, transform, second_stage):
     """
     # Set the path to the directory containing the images
     path = os.path.join(data_dir, "train" if train else "val")
+    
     # Return an instance of the `BioDataset` class
     return BioDataset(path, transform, second_stage)

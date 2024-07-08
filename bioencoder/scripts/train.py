@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+#%% imports
+
+
 import argparse
 import logging
 import os
 import time
 import shutil
 import sys 
-
 from rich.pretty import pretty_repr
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
 
-from bioencoder.core import utils
+from bioencoder import config, utils
 
-#%%
+#%% function
 
 def train(
     config_path,
+    dry_run=False,
     overwrite=False,
     **kwargs,
 ):
@@ -56,11 +59,9 @@ def train(
     To start a new training session with overwriting previous outputs:
         bioencoder.train("/path/to/config.yaml", overwrite=True)
 
-
     """
     
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
@@ -83,6 +84,8 @@ def train(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
+    aug_sample = hyperparams["augmentations"].get("save_sample", False)
+    aug_sample_n = hyperparams["augmentations"].get("sample_n", 5)
 
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
@@ -166,7 +169,7 @@ def train(
     utils.set_seed()
 
     # create model, loaders, optimizer, etc
-    transforms = utils.build_transforms(hyperparams)
+    transforms = utils.build_transforms(hyperparams)    
     loaders = utils.build_loaders(
         data_dir, 
         transforms, 
@@ -182,6 +185,10 @@ def train(
         ckpt_pretrained=ckpt_pretrained,
     ).cuda()
     
+    if aug_sample:
+        utils.save_augmented_sample(data_dir, transforms["train_transforms"], aug_sample_n)
+        logger.info(f"Saving augmentation samples: {aug_sample_n} per class to data/{run_name}/aug_sample")
+
     logger.info(f"Using backbone: {backbone}")
     
     ## configure GPU 
@@ -217,120 +224,123 @@ def train(
             
     # epoch loop
     metric_best = 0
-    for epoch in range(n_epochs):
-        logger.info(utils.pprint_fill_hbar(f"START - Epoch {epoch}"))
-        start_training_time = time.time()
-        if stage == "first":
-            train_metrics = utils.train_epoch_constructive(
-                loaders["train_supcon_loader"], 
-                model, 
-                criterion, 
-                optimizer, 
-                scaler, 
-                ema, 
-                loss_optimizer
-            )
-        else:
-            train_metrics = utils.train_epoch_ce(
-                loaders["train_features_loader"],
-                model,
-                criterion,
-                optimizer,
-                scaler,
-                ema,
-            )
-        end_training_time = time.time()
+    if not dry_run:
+        for epoch in range(n_epochs):
+            logger.info(utils.pprint_fill_hbar(f"START - Epoch {epoch}"))
+            start_training_time = time.time()
+            if stage == "first":
+                train_metrics = utils.train_epoch_constructive(
+                    loaders["train_supcon_loader"], 
+                    model, 
+                    criterion, 
+                    optimizer, 
+                    scaler, 
+                    ema, 
+                    loss_optimizer
+                )
+            else:
+                train_metrics = utils.train_epoch_ce(
+                    loaders["train_features_loader"],
+                    model,
+                    criterion,
+                    optimizer,
+                    scaler,
+                    ema,
+                )
+            end_training_time = time.time()
+    
+            if ema:
+                copy_of_model_parameters = utils.copy_parameters_from_model(model)
+                ema.copy_to(model.parameters())
+    
+            start_validation_time = time.time()
+    
+            if stage == "first":
+                valid_metrics_projection_head = utils.validation_constructive(
+                    loaders["valid_loader"], loaders["train_features_loader"], model, scaler
+                )
+                
+                ## check for GPU parallelization
+                #model_copy = model.module if isinstance(model, torch.nn.DataParallel) else model
+                
+                #model_copy.use_projection_head(False)
+                model.use_projection_head(False)
+                valid_metrics_encoder = utils.validation_constructive(
+                    loaders["valid_loader"], loaders["train_features_loader"], model, scaler
+                )
+                model.use_projection_head(True)
+                #model_copy.use_projection_head(True)    parser.add_argument("--dry_run", action='store_true', help="Run without making any changes.")
 
-        if ema:
-            copy_of_model_parameters = utils.copy_parameters_from_model(model)
-            ema.copy_to(model.parameters())
-
-        start_validation_time = time.time()
-
-        if stage == "first":
-            valid_metrics_projection_head = utils.validation_constructive(
-                loaders["valid_loader"], loaders["train_features_loader"], model, scaler
-            )
-            
-            ## check for GPU parallelization
-            #model_copy = model.module if isinstance(model, torch.nn.DataParallel) else model
-            
-            #model_copy.use_projection_head(False)
-            model.use_projection_head(False)
-            valid_metrics_encoder = utils.validation_constructive(
-                loaders["valid_loader"], loaders["train_features_loader"], model, scaler
-            )
-            model.use_projection_head(True)
-            #model_copy.use_projection_head(True)
-            
-            ## epoch summary
-            message = "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
-                epoch,
-                end_training_time - start_training_time,
-                time.time() - start_validation_time,
-                train_metrics["loss"],
-                pretty_repr(valid_metrics_projection_head),
-                pretty_repr(valid_metrics_encoder),
-            )
-            logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
-            valid_metrics = valid_metrics_projection_head
-        else:
-            valid_metrics = utils.validation_ce(
-                model, criterion, loaders["valid_loader"], scaler
-            )
-            ## epoch summary
-            message =  "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
+                
+                ## epoch summary
+                message = "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
                     epoch,
                     end_training_time - start_training_time,
                     time.time() - start_validation_time,
                     train_metrics["loss"],
-                    pretty_repr(valid_metrics),
-            )
-            logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
-
-        # write train and valid metrics to the logs
-        utils.add_to_tensorboard_logs(
-            writer, train_metrics["loss"], "Loss/train", epoch
-        )
-        for valid_metric in valid_metrics:
-            try:
-                utils.add_to_tensorboard_logs(
-                    writer,
-                    valid_metrics[valid_metric],
-                    "{}/validation".format(valid_metric),
-                    epoch,
+                    pretty_repr(valid_metrics_projection_head),
+                    pretty_repr(valid_metrics_encoder),
                 )
-            except AssertionError:
-                # in case valid metric is a list
-                pass
-
-        # check if the best value of metric changed. If so -> save the model
-        if (
-            valid_metrics[target_metric] > metric_best*0.99
-        ):  # > 0 if wanting to save all models 
-            logger.info(
-                "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(
-                    target_metric, metric_best, valid_metrics[target_metric]
+                logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
+                valid_metrics = valid_metrics_projection_head
+            else:
+                valid_metrics = utils.validation_ce(
+                    model, criterion, loaders["valid_loader"], scaler
                 )
+                ## epoch summary
+                message =  "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
+                        epoch,
+                        end_training_time - start_training_time,
+                        time.time() - start_validation_time,
+                        train_metrics["loss"],
+                        pretty_repr(valid_metrics),
+                )
+                logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
+    
+            # write train and valid metrics to the logs
+            utils.add_to_tensorboard_logs(
+                writer, train_metrics["loss"], "Loss/train", epoch
             )
-
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                },
-                os.path.join(weights_dir, f"epoch{epoch}"),
-            )
-            metric_best = valid_metrics[target_metric]
-
-        # if ema is used, go back to regular weights without ema
-        if ema:
-            utils.copy_parameters_to_model(copy_of_model_parameters, model)
-
-        scheduler.step()
-        logger.info(utils.pprint_fill_hbar(f"END - Epoch {epoch}"))
-                
+            for valid_metric in valid_metrics:
+                try:
+                    utils.add_to_tensorboard_logs(
+                        writer,
+                        valid_metrics[valid_metric],
+                        "{}/validation".format(valid_metric),
+                        epoch,
+                    )
+                except AssertionError:
+                    # in case valid metric is a listhyperparams
+                    pass
+    
+            # check if the best value of metric changed. If so -> save the model
+            if (
+                valid_metrics[target_metric] > metric_best*0.99
+            ):  # > 0 if wanting to save all models 
+                logger.info(
+                    "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(
+                        target_metric, metric_best, valid_metrics[target_metric]
+                    )
+                )
+    
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                    },
+                    os.path.join(weights_dir, f"epoch{epoch}"),
+                )
+                metric_best = valid_metrics[target_metric]
+    
+            # if ema is used, go back to regular weights without ema
+            if ema:
+                utils.copy_parameters_to_model(copy_of_model_parameters, model)
+    
+            scheduler.step()
+            logger.info(utils.pprint_fill_hbar(f"END - Epoch {epoch}"))
+    else:
+        logger.info(utils.pprint_fill_hbar("DRY-RUN ONLY - NO TRAINING"))
     writer.close()
     logging.shutdown()
 
@@ -338,13 +348,13 @@ def train(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file that specifies detailed training and optimizer parameters.")
+    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file that specifies detailed training and optimizer parameters.")
+    parser.add_argument("--dry-run", action='store_true', help="Run without starting the training to inspect config and augmentations.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
     
-    train(args.config_path,
-          overwrite=args.overwrite)
-
+    train_cli = utils.restore_config(train)
+    train_cli(args.config_path, overwrite=args.overwrite, dry_run=args.dry_run)
 
 if __name__ == "__main__":
     

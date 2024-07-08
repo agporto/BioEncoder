@@ -1,14 +1,17 @@
+import cv2
+import importlib
 import random
 import os
 import numpy as np
 import yaml
-import io
-import zipfile 
-
-from contextlib import redirect_stdout
-from dataclasses import make_dataclass
+from collections import defaultdict
+from PIL import Image
+from tqdm import tqdm
+from functools import wraps
 
 import torch
+from torchvision.transforms import ToPILImage
+from torchvision.datasets import ImageFolder
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import f1_score #, accuracy_score
 
@@ -20,27 +23,47 @@ from .datasets import create_dataset
 from .augmentations import get_transforms
 
 
+def save_yaml(dic, yaml_path):
+    with open(yaml_path, 'w') as file:
+        yaml.dump(dic, file, default_flow_style=False)
+
 def load_yaml(yaml_path):
     
     with open(yaml_path, "r") as file:
         dictionary = yaml.full_load(file)
 
-    return dictionary
+    return dictionary  
 
+def restore_config(func):
+    """
+    Decorator to restore configuration from a YAML file and inject it into the bioencoder.config module.
+    Needed only when using BioEncoder in CLI mode, NOT in interactive mode where config is loaded directly
+    When the decorated function is called, the decorator will:
+        
+    1. Load the configuration from a predefined YAML file path.
+    2. Import the bioencoder.config module.
+    3. Update the attributes of the bioencoder.config module with the loaded configuration values.
+    4. Execute the original function with the injected configuration.
+   
+    Notes
+    -----
+    - The decorator expects the configuration file to be located at '~/.bioencoder.yaml'.
+    - The configuration file should be in YAML format.
+    - The attributes in the YAML file must match the expected attributes in the bioencoder.config module.
+    """
+    
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        config_path = os.path.expanduser("~/.bioencoder.yaml")  # Updated to load from YAML
+        config = load_yaml(config_path)
 
-def load_config(config_path=None):
-    
-    if not config_path:
-        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")
-    
-    config = load_yaml(config_path)
-    dataclass = make_dataclass(
-        cls_name="config",
-        fields=config
-    )
-    config_dataclass = dataclass(**config)
-    
-    return config_dataclass
+        # Import the bioencoder config module and update its attributes
+        config_module = importlib.import_module('bioencoder.config')
+        for key, value in config.items():
+            setattr(config_module, key, value)
+                
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def load_model(
@@ -62,7 +85,7 @@ def load_model(
 def update_config(config, config_path=None):
     
     if not config_path:
-        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder")
+        config_path = os.path.join(os.path.expanduser("~"), ".bioencoder.yaml")
     
     with open(config_path, 'w') as file:
         yaml.dump(config.__dict__, file, default_flow_style=False)
@@ -607,3 +630,44 @@ def copy_parameters_to_model(params, model):
     for s_param, param in zip(params, model.parameters()):
         if param.requires_grad:
             param.data.copy_(s_param.data)
+
+
+def save_augmented_sample(data_dir, transform, n_samples):
+    """
+    Save a sample of augmented images for each class.
+
+    Args:
+        data_dir (str): Path to the directory containing the images.
+        transform (callable): Transformation to be applied to the images.
+        n_samples_per_class (int): Number of images to sample and save per class.
+        save_dir (str): Directory to save the augmented image samples.
+    """
+    # Load dataset
+    dataset = ImageFolder(root=os.path.join(data_dir, "train"))
+    save_dir = os.path.join(data_dir, "aug_sample")
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Organize samples by class
+    class_to_indices = defaultdict(list)
+    for idx, (path, label) in enumerate(dataset.samples):
+        class_to_indices[label].append(idx)
+
+    # Process and save images
+    for class_label, indices in class_to_indices.items():
+        
+        # Randomly select n_samples_per_class indices
+        selected_indices = random.sample(indices, min(n_samples, len(indices)))
+        class_label_str = dataset.classes[class_label]
+
+        ## apply augmentations and save
+        for i, idx in enumerate(selected_indices):
+            path, _ = dataset.samples[idx]
+            image = Image.open(path)
+            image_name = os.path.basename(path)
+            augmented_image = transform(image=np.asarray(image))["image"]   
+            to_pil_image = ToPILImage()
+            augmented_image = to_pil_image(augmented_image)
+            sample_path = os.path.join(save_dir, f"{class_label_str}_{image_name}_augmented.png")
+            augmented_image.save(sample_path)
+
+

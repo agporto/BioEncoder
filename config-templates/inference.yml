@@ -1,0 +1,10 @@
+model:
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
+  checkpoint: swa # Checkpoint to load: "swa" for Stochastic Weight Averaging, or specify a file in the weights folder (e.g., epoch98)
+  checkpoint_path: # Path to the checkpoint file (to be specified if not using default "swa")
+  stage: second # Training stage: 'first' for embeddings, 'second' for classification
+  num_classes: 4 # Number of output classes for classification
+
+img_size: 384 # Image size for training and validation
+
+standardize: false # Whether to apply standardization to the input images
