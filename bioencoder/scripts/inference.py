@@ -92,16 +92,23 @@ def inference(
     ## get labels
     train_dir = os.path.join(root_dir,"data",  run_name, "train")
     labels_sorted = ImageFolder(root=train_dir).classes
-     
-    ## load / check image
+         
+    
     if isinstance(image, str):
         if os.path.isfile(image):
             image = Image.open(image)
             image = np.asarray(image)
-            
-    if not isinstance(image, np.ndarray):
-        image = np.asarray(image)
-        
+        else:
+            print("File does not exist")
+            return
+    elif isinstance(image, (np.ndarray, np.generic)):
+        print("image shape:" + str(image.shape))
+        # Input is already a numpy array or an instance of np.generic (which np.ndarray inherits from)
+        pass
+    else:
+        print("Wrong format - need either image path or array type")
+        return
+    
     ## transform image and move to GPU
     image = transform(image=image)["image"]
     image = image.unsqueeze(0).cuda()
@@ -136,11 +143,12 @@ def cli():
         
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
-    parser.add_argument("--image", type=np.array, help="Image to embedd / classify.")
+    parser.add_argument("--image", type=str, help="Path to image to embedd / classify.")
     args = parser.parse_args()
     
     inference_cli = utils.restore_config(inference)
-    inference_cli(args.config_path, image=args.image)
+    result = inference_cli(args.config_path, image=args.image)
+    print(result)
     
 if __name__ == "__main__":
     
