@@ -48,7 +48,7 @@ import bioencoder
 bioencoder.configure(root_dir=r"~/bioencoder_wd", run_name="v1")
 
 ## split dataset
-bioencoder.split_dataset(image_dir=r"~/Downloads/damselflies-aligned-trai_val", max_ratio=6, random_seed=42)
+bioencoder.split_dataset(image_dir=r"~/Downloads/damselflies-aligned-trai_val", max_ratio=6, random_seed=42, val_percent=0.1, min_per_class=20)
 
 ## train stage 1
 bioencoder.train(config_path=r"bioencoder_configs/train_stage1.yml")
@@ -68,6 +68,9 @@ bioencoder.swa(config_path=r"bioencoder_configs/swa_stage2.yml")
 ## explore model from stage 2
 bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
 
+## inference (stage 1 = embeddings, stage 2 = classification)
+bioencoder.inference(config_path="bioencoder_configs/inference.yml", image="path/to/image.jpg")
+
 ```
 4\. Alternatively, you can directly use the command line interface: 
 
@@ -84,6 +87,7 @@ bioencoder_lr_finder --config-path "bioencoder_configs/lr_finder.yml"
 bioencoder_train --config-path "bioencoder_configs/train_stage2.yml"
 bioencoder_swa --config-path "bioencoder_configs/swa_stage2.yml"
 bioencoder_model_explorer --config-path "bioencoder_configs/explore_stage2.yml"
+bioencoder_inference --config-path "bioencoder_configs/inference.yml" --image "path/to/image.jpg"
 
 ```
 
