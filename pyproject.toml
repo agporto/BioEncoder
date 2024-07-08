@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = "==3.9.*"
 keywords = ["metric learning", "biology"]
 dynamic = ["dependencies"]
-version = "0.2.1"
+version = "0.3.0"
 
 [project.urls]
 "Homepage" = "https://github.com/agporto/BioEncoder"
@@ -27,6 +27,7 @@ bioencoder_swa = "bioencoder.scripts.swa:cli"
 bioencoder_lr_finder = "bioencoder.scripts.lr_finder:cli"
 bioencoder_interactive_plots = "bioencoder.scripts.interactive_plots:cli"
 bioencoder_model_explorer = "bioencoder.scripts.model_explorer_wrapper:cli"
+bioencoder_inference = "bioencoder.scripts.inference:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

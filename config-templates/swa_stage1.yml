@@ -1,16 +1,14 @@
 model:
-  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  top_k_checkpoints: 3
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
+  top_k_checkpoints: 3 # Number of best model checkpoints to save based on validation metric
 
 train:
-  amp: True # set this to True, if your GPU supports FP16. 2080Ti - okay, 1080Ti - not okay
-  stage: first
+  amp: True # Enable Automatic Mixed Precision (AMP) for faster training on compatible GPUs
+  stage: first # Training stage: 'first' for SupCon, 'second' for fine-tuning classification
 
 dataloaders:
-  train_batch_size: 50 
-  valid_batch_size: 50
-  num_workers: 32 
+  train_batch_size: 40 # Batch size for training data
+  valid_batch_size: 40 # Batch size for validation data
+  num_workers: 16 # Number of CPU threads for data loading
 
-img_size: 384
-
-
+img_size: 384 # Image size for training and validation

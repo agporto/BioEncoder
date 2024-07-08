@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
+
 import os
 import argparse
 import shutil
 import random
 
-from bioencoder.core import utils
+from bioencoder import config, utils
 
-#%%
+#%% function
 
 def split_dataset(
         image_dir, 
@@ -81,7 +83,6 @@ def split_dataset(
     """
     
     ## load bioencoer configmin_images
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
@@ -212,7 +213,8 @@ def cli():
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
     
-    split_dataset(
+    split_dataset_cli = utils.restore_config(split_dataset)    
+    split_dataset_cli(
          args.image_dir, 
          mode=args.mode,
          val_percent=args.val_percent,

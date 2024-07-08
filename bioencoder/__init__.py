@@ -9,6 +9,7 @@ from .scripts.train import train
 from .scripts.swa import swa
 from .scripts.lr_finder import lr_finder
 from .scripts.interactive_plots import interactive_plots
+from .scripts.inference import inference
 from .scripts.model_explorer_wrapper import model_explorer_wrapper as model_explorer
 
 from importlib.metadata import version

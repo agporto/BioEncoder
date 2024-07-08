@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse
-import io
-import os
+#%% imports
 
+import argparse
+import os
 import matplotlib.pyplot as plt
-from contextlib import redirect_stdout
+
 from torch_lr_finder import LRFinder
 
-from bioencoder.core import utils
+from bioencoder import config, utils
 
-#%%
+#%% function
 
 def lr_finder(    
         config_path, 
         overwrite=False,
+        
         **kwargs,
 ):
     """
@@ -56,7 +57,6 @@ def lr_finder(
     """
     
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
@@ -64,24 +64,29 @@ def lr_finder(
     hyperparams = utils.load_yaml(config_path)
     
     ## parse config
-    backbone = hyperparams["model"]["backbone"]
-    num_classes = hyperparams["model"]["num_classes"]
-    optimizer_params = hyperparams["optimizer"]
+    backbone = hyperparams["model"].get("backbone")
+    num_classes = hyperparams["model"].get("num_classes")
+    optimizer_params = hyperparams.get("optimizer")
     scheduler_params = None
-    criterion_params = hyperparams["criterion"]
+    criterion_params = hyperparams.get("criterion")
     batch_sizes = {
-        "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
-        "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
+        "train_batch_size": hyperparams["dataloaders"].get("train_batch_size", None),
+        "valid_batch_size": hyperparams["dataloaders"].get("valid_batch_size", None),
     }
-    num_workers = hyperparams["dataloaders"]["num_workers"]
-    
+    num_workers = hyperparams["dataloaders"].get("num_workers", 8)
+    num_iter = hyperparams.get("num_workers", 300)
+    skip_start = hyperparams.get("skip_start", num_iter//10)
+    skip_end = hyperparams.get("save_figure", num_iter//10)
+    return_LR = hyperparams.get("return_LR", False)
+    save_figure = hyperparams.get("save_figure", False)
+
     ## set up dirs
     data_dir = os.path.join(root_dir,"data",  run_name)
-    plot_dir = os.path.join(root_dir, "plots")
+    plot_dir = os.path.join(root_dir, "plots", run_name)
     os.makedirs(plot_dir, exist_ok=True)
 
     ## construct file path
-    plot_path = os.path.join(plot_dir, "{}_lr_finder_supcon_{}_bs_{}.png".format(
+    plot_path = os.path.join(plot_dir, "LRfinder_{}_{}_{}.png".format(
         run_name,
         optimizer_params["name"],
         batch_sizes["train_batch_size"],
@@ -113,32 +118,28 @@ def lr_finder(
         optim["scheduler"],
     )
     lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
-    lr_finder.range_test(loaders["train_features_loader"], end_lr=1, num_iter=300)
-    fig, ax = plt.subplots()
-    
-    f = io.StringIO()
-    with redirect_stdout(f):
-        lr_finder.plot(ax=ax)
-    s = f.getvalue()
-    print_msg = s.split("\n")[1]
-    print(print_msg)
-    
-    config.second_lr = print_msg.split(": ")[1]
-    utils.update_config(config)
-    
-    fig.suptitle(print_msg, fontsize=20)
+    lr_finder.range_test(loaders["train_features_loader"], end_lr=1, num_iter=num_iter)
 
-    fig.savefig(plot_path)
+    fig, ax = plt.subplots()
+    ax, lr = lr_finder.plot(ax=ax, skip_start=skip_start, skip_end=skip_end)
+    config.lr = round(lr, 6)
+    fig.suptitle(f"Suggested LR: {config.lr}" , fontsize=20)
+
+    if save_figure:
+        fig.savefig(plot_path)
+        
+    if return_LR:
+        return config.lr
 
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for the LR finder.")
+    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for the LR finder.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 
-    lr_finder(args.config_path, overwrite=args.overwrite)
-
+    lr_finder_cli = utils.restore_config(lr_finder)
+    lr_finder_cli(args.config_path, overwrite=args.overwrite)
 
 if __name__ == "__main__":
     

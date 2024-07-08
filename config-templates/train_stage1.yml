@@ -1,50 +1,47 @@
 model:
-  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
+  num_classes: # No classes in first stage
 
 train:
-  n_epochs: &epochs 100
-  amp: True # set this to True, if your GPU supports FP16. 2080Ti - okay, 1080Ti - not okay
-  ema: True # optional, but I recommend it, since the training might get unstable otherwise
-  ema_decay_per_epoch: 0.4 # 0.3 for middle/big datasets. Increase, if you have low amount of samples
-  target_metric: precision_at_1
-  stage: first # first = Supcon, second = FC finetuning for classification
+  n_epochs: &epochs 100 # Number of training epochs
+  amp: True # Enable Automatic Mixed Precision (AMP) for faster training on compatible GPUs
+  ema: True # Use Exponential Moving Average to stabilize training
+  ema_decay_per_epoch: 0.4 # EMA decay rate; adjust based on dataset size
+  target_metric: precision_at_1 # Metric to optimize during training
+  stage: first # Training stage: 'first' for SupCon, 'second' for fine-tuning classification
 
 dataloaders:
-  train_batch_size: 50 # the higher - the better
-  valid_batch_size: 50
-  num_workers: 32 # set this to num of threads in your CPU
+  train_batch_size: 40 # Batch size for training data
+  valid_batch_size: 40 # Batch size for validation data
+  num_workers: 16 # Number of CPU threads for data loading
 
 optimizer:
-  name: SGD
+  name: SGD # Optimizer type
   params:
-    lr: 0.003
+    lr: 0.003 # Learning rate
 
 scheduler:
-  name: CosineAnnealingLR
+  name: CosineAnnealingLR # Learning rate scheduler
   params:
-    T_max: *epochs
-    eta_min: 0.0003 # Make sure it is smaller than lr
+    T_max: *epochs # Maximum number of iterations
+    eta_min: 0.0003 # Minimum learning rate
 
 criterion:
-  name: 'SupCon'
+  name: 'SupCon' # Loss function
   params:
-    temperature: 0.1
+    temperature: 0.1 # Temperature parameter for contrastive loss
 
-img_size: &size 384
+img_size: 384 # Image size for training and validation
 
 augmentations:
-  transforms: 
-    - RandomResizedCrop:
-        height: *size
-        width: *size 
-        scale:  !!python/tuple [0.7,1]
-    - Flip:
-    - RandomRotate90:
-    - MedianBlur:
-        blur_limit: 3
-        p: 0.3
-    - ShiftScaleRotate:
-        p: 0.4
-    - OpticalDistortion:
-    - GridDistortion:
-    - HueSaturationValue:
+  save_sample: True # Whether to save a sample of augmented images
+  sample_n: 10 # Number of augmented image samples per class to save
+  transforms:
+    - RandomResizedCrop: # Randomly resize and crop the image
+    - Flip: # Randomly flip the image horizontally
+    - RandomRotate90: # Randomly rotate the image by 90 degrees
+    - MedianBlur: # Apply median blur with a probability
+    - ShiftScaleRotate: # Randomly apply affine transformations
+    - OpticalDistortion: # Apply optical distortion to the image
+    - GridDistortion: # Apply grid distortion to the image
+    - HueSaturationValue: # Randomly change hue, saturation, and value of the image

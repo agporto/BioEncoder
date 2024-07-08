@@ -3,15 +3,13 @@
 
 import argparse
 import os 
-
-import streamlit as st
-import torch
-
-from streamlit_option_menu import option_menu
 from PIL import Image
 
-from bioencoder.core import utils
-from bioencoder import vis
+import torch
+import streamlit as st
+from streamlit_option_menu import option_menu
+
+from bioencoder import config, utils, vis
 
 #%%
 
@@ -62,7 +60,6 @@ def model_explorer(
     """
     
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
@@ -150,11 +147,10 @@ def model_explorer(
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config-path",
-        type=str,
-        default=None,
-    )
+    parser.add_argument( "--config-path", type=str, default=None)
     args = parser.parse_args()
-        
-    model_explorer(args.config_path)
+            
+    model_explorer_cli = utils.restore_config(model_explorer)
+    model_explorer_cli(args.config_path)
+    
+    print("BIER")

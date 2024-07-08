@@ -1,17 +1,16 @@
 model:
-  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  num_classes: 4
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
+  num_classes: 4 # Number of output classes for classification
 
 dataloaders:
-  train_batch_size: 50 # the higher - the better
-  valid_batch_size: 50
-  num_workers: 32 # set this to num of threads in your CPU
+  train_batch_size: 50 # Batch size for training data; larger sizes utilize GPU memory better
+  valid_batch_size: 50 # Batch size for validation data
+  num_workers: 32 # Number of CPU threads for data loading; set to the number of CPU cores available
 
 optimizer:
-  name: SGD
+  name: SGD # Optimizer type
   params:
-    lr: 0.001
+    lr: 0.001 # Learning rate
 
 criterion:
-  name: 'CrossEntropy'
-
+  name: 'CrossEntropy' # Loss function for multi-class classification

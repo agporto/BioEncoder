@@ -1,14 +1,12 @@
 import os
 import argparse
-import yaml
 import numpy as np
 import pandas as pd
 import torch
 
-from pathlib import Path
-
 from bioencoder.core import utils
 from bioencoder.vis import helpers
+from bioencoder import config
 
 def interactive_plots(    
         config_path, 
@@ -49,7 +47,6 @@ def interactive_plots(
     """
         
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
     root_dir = config.root_dir
     run_name = config.run_name
     
@@ -76,11 +73,11 @@ def interactive_plots(
     
     ## set up dirs
     data_dir = os.path.join(root_dir,"data",  run_name)
-    plot_dir = os.path.join(root_dir, "plots",  run_name)
+    plot_dir = os.path.join(root_dir, "plots", run_name)
     os.makedirs(plot_dir, exist_ok=True)
     
     ## plot path
-    plot_path = os.path.join(plot_dir, f"{run_name}.html")
+    plot_path = os.path.join(plot_dir, f"embeddings_{run_name}.html")
     if not overwrite and not kwargs.get("ret_embeddings"):
         assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
     
@@ -139,16 +136,16 @@ def interactive_plots(
     
     
 def cli():
-
+        
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
+    parser.add_argument("--config-path", type=str, help="Path to the YAML configuration file to create interactive plots.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 
-    interactive_plots(args.config_path, overwrite=args.overwrite)
+    interactive_plots_cli = utils.restore_config(interactive_plots)
+    interactive_plots_cli(args.config_path, overwrite=args.overwrite)
     
     
-
 if __name__ == "__main__":
     
     cli()

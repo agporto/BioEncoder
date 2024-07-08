@@ -1,53 +1,53 @@
 import os
 import argparse
-import yaml
 import numpy as np
-import pandas as pd
+import pickle
 import torch
+from torchvision.datasets import ImageFolder
+from PIL import Image
 
-from pathlib import Path
-
+from bioencoder import config
 from bioencoder.core import utils
-from bioencoder.vis import helpers
 
 def inference(    
         config_path, 
+        image,
         **kwargs,
 ):
 
     """
-    Generates interactive plots for visualizing high-dimensional embeddings of validation set.
-    This function computes embeddings using a trained model, reduces their dimensionality,
-    and plots them in an interactive plot saved as an HTML file. Optionally, it can also return
-    embeddings data as a DataFrame (ret_embeddings=True).
-    
+    Generates embeddings or class predictions for a given image using a trained model.
+    This function loads the model configuration, processes the input image, and computes
+    the embeddings or class probabilities based on the specified model stage.
+
     Parameters
     ----------
     config_path : str
         Path to the YAML file that contains settings for the model.
         This configuration includes details on model architecture, data loaders, and other
         hyperparameters required for embedding computation.
+    image : str or np.ndarray
+        Path to the image file or an image represented as a numpy array.
+        The image is processed and transformed before being passed through the model.
 
-    Raises
-    ------
-    AssertionError
-        If 'overwrite' is False and a plot file already exists at the specified location.
-    FileNotFoundError
-        If the configuration file does not exist.
-    
+    Returns
+    -------
+    np.ndarray or dict
+        If stage is 'first', returns the image embeddings as a numpy array.
+        If stage is 'second' and return_probs is False, returns the class with the highest probability.
+        If stage is 'second' and return_probs is True, returns a dictionary with class probabilities.
+   
     Examples
     --------
-    To generate interactive plots for model embeddings:
-        bioencoder.inference("/path/to/config.yaml")
-    
+    To generate embeddings for a given image:
+        embeddings = bioencoder.inference("/path/to/config.yaml", "/path/to/image.jpg")
 
     """
         
     ## load bioencoer config
-    config = utils.load_config(kwargs.get("bioencoder_config_path"))
-    root_dir = config.root_dir
     run_name = config.run_name
-    
+    root_dir = config.root_dir
+
     ## load config
     hyperparams = utils.load_yaml(config_path)
     
@@ -55,95 +55,93 @@ def inference(
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"].get("num_classes", None)
     checkpoint = hyperparams["model"].get("checkpoint", "swa")
+    checkpoint_path = hyperparams["model"].get("checkpoint_path", None)
     stage = hyperparams["model"].get("stage", "first")
-    batch_sizes = {
-        "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
-        "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
-    }
-    num_workers = hyperparams["dataloaders"]["num_workers"]
-    color_classes = hyperparams.get("color_classes", None)
-    color_map = hyperparams.get("color_map", "jet")
-    plot_style = hyperparams.get("plot_style", 1)
-    point_size = hyperparams.get("point_size", 10)
+    standardize = hyperparams.get("standardize", False)
+    return_probs = hyperparams.get("return_probs", False)
 
-    ## init scaler
-    scaler = torch.cuda.amp.GradScaler()
-    
-    ## set up dirs
-    data_dir = os.path.join(root_dir,"data",  run_name)
-    plot_dir = os.path.join(root_dir, "plots",  run_name)
-    os.makedirs(plot_dir, exist_ok=True)
-    
-    ## plot path
-    plot_path = os.path.join(plot_dir, f"{run_name}.html")
-    if not overwrite and not kwargs.get("ret_embeddings"):
-        assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
-    
     ## load weights
-    print(f"Checkpoint: using {checkpoint} of {stage} stage")
-    ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, checkpoint)
+    if checkpoint_path:
+        ckpt_pretrained = checkpoint_path
+    else:    
+        ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, checkpoint)
 
     ## set random seed
     utils.set_seed()
 
-    ## extract embeddings
-    transforms = utils.build_transforms(hyperparams)
-    loaders = utils.build_loaders(
-        data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second")
-    )
-    model = utils.build_model(
-        backbone,
-        second_stage=(stage == "second"),
-        num_classes=num_classes,
-        ckpt_pretrained=ckpt_pretrained,
-    ).cuda()
-    model.use_projection_head(False)
-    model.eval()
-    embeddings_train, labels_train = utils.compute_embeddings(
-        loaders["valid_loader"], model, scaler
-    )
-    
-    ## load dataset
-    rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs]
-       
-    ## return embeddings without plotting
-    if kwargs.get("ret_embeddings"):
+    ## get transformations
+    transform = utils.get_transforms(hyperparams, valid=False)
+
+    ## build model
+    if config.model_path != ckpt_pretrained:
+        print(f"loading checkpoint: {ckpt_pretrained}")
+        model = utils.build_model(
+            backbone,
+            second_stage=(stage == "second"),
+            num_classes=num_classes,
+            ckpt_pretrained=ckpt_pretrained,
+        ).cuda()
+        config.model = model
+        config.model_path = ckpt_pretrained
+    else: 
+        model = config.model
         
-        df = pd.DataFrame([os.path.basename(item) for item in rel_paths_train], columns=["image_name"])
-        df["class"] = [
-            os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
-        ]
-        return pd.concat([df, pd.DataFrame(embeddings_train)], axis=1)
+    ## set to eval
+    model.eval()
+
+    ## get labels
+    train_dir = os.path.join(root_dir,"data",  run_name, "train")
+    labels_sorted = ImageFolder(root=train_dir).classes
+     
+    ## load / check image
+    if isinstance(image, str):
+        if os.path.isfile(image):
+            image = Image.open(image)
+            image = np.asarray(image)
+            
+    if not isinstance(image, np.ndarray):
+        image = np.asarray(image)
+        
+    ## transform image and move to GPU
+    image = transform(image=image)["image"]
+    image = image.unsqueeze(0).cuda()
+        
+    ## get embeddings / logits
+    with torch.no_grad():
+        output = model(image)
     
-    reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(
-        embeddings_train
-    )       
-    df = pd.DataFrame(reduced_data, columns=colnames)
-    df["paths"] = [ os.path.join("..", "..", item) for item in rel_paths_train]
-    df["class"] = labels_train
-    df["class_str"] = [
-        os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
-    ]
-    
-    ## check if color matches n classes
-    if color_classes:
-        assert len(np.unique(labels_train)) == len(color_classes), f"Number of classes is {len(np.unique(labels_train))}, but you only provided {len(color_classes)} colors"
-    
-    helpers.bokeh_plot(df, out_path=plot_path, color_map=color_map, color_classes=color_classes, 
-                       plot_style=plot_style, point_size=point_size)
-    
-    
+    if stage=="first":
+        model.use_projection_head(False)
+        embeddings = output.detach().cpu().numpy().squeeze()  
+        embeddings = np.float32(embeddings)
+        if standardize:
+            mean = np.mean(embeddings, axis=0)
+            std = np.std(embeddings, axis=0)
+            embeddings = (embeddings - mean) / std
+        result = embeddings    
+        
+    elif stage=="second":
+        model.use_projection_head((stage=='second'))
+        probabilities = torch.nn.functional.softmax(output, dim=1)
+        probabilities = probabilities.detach().cpu().numpy().squeeze()  
+        classes = {class_name: float(prob) for class_name, prob in zip(labels_sorted, np.float32(probabilities))}
+        if return_probs:
+            result = classes
+        else:
+            result = max(classes, key=classes.get)
+        
+    return result
+
 def cli():
-
+        
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
-    parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
+    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
+    parser.add_argument("--image", type=np.array, help="Image to embedd / classify.")
     args = parser.parse_args()
-
-    interactive_plots(args.config_path, overwrite=args.overwrite)
     
+    inference_cli = utils.restore_config(inference)
+    inference_cli(args.config_path, image=args.image)
     
-
 if __name__ == "__main__":
     
     cli()

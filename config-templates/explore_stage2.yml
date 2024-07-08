@@ -1,4 +1,5 @@
 model:
-  backbone: timm_tf_efficientnet_b5.ns_jft_in1k
-  num_classes: 4
-  stage: 'second'
+  backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
+  stage: second # Training stage: 'first' for embeddings, 'second' for classification
+  num_classes: 4 # Number of output classes for classification
+

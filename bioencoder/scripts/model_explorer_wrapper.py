@@ -21,11 +21,7 @@ def model_explorer_wrapper(config_path):
 def cli():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config-path",
-        type=str,
-        default=None,
-    )
+    parser.add_argument("--config-path",type=str, default=None)
     args = parser.parse_args()
         
     model_explorer_wrapper(args.config_path)
