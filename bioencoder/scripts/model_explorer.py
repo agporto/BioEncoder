@@ -152,5 +152,3 @@ if __name__ == "__main__":
             
     model_explorer_cli = utils.restore_config(model_explorer)
     model_explorer_cli(args.config_path)
-    
-    print("BIER")
