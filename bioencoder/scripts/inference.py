@@ -1,13 +1,23 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#%% imports
+
+
 import os
 import argparse
 import numpy as np
+import pandas as pd
 import pickle
 import torch
 from torchvision.datasets import ImageFolder
 from PIL import Image
+from tqdm import tqdm 
 
 from bioencoder import config
 from bioencoder.core import utils
+
+#%% function
 
 def inference(    
         config_path, 
@@ -57,8 +67,8 @@ def inference(
     checkpoint = hyperparams["model"].get("checkpoint", "swa")
     checkpoint_path = hyperparams["model"].get("checkpoint_path", None)
     stage = hyperparams["model"].get("stage", "first")
-    standardize = hyperparams.get("standardize", False)
     return_probs = hyperparams.get("return_probs", False)
+    device = hyperparams.get("device", "cuda")
 
     ## load weights
     if checkpoint_path:
@@ -80,7 +90,8 @@ def inference(
             second_stage=(stage == "second"),
             num_classes=num_classes,
             ckpt_pretrained=ckpt_pretrained,
-        ).cuda()
+        )
+        model.to(device)
         config.model = model
         config.model_path = ckpt_pretrained
     else: 
@@ -93,7 +104,7 @@ def inference(
     train_dir = os.path.join(root_dir,"data",  run_name, "train")
     labels_sorted = ImageFolder(root=train_dir).classes
          
-    
+    ## load file
     if isinstance(image, str):
         if os.path.isfile(image):
             image = Image.open(image)
@@ -111,8 +122,8 @@ def inference(
     
     ## transform image and move to GPU
     image = transform(image=image)["image"]
-    image = image.unsqueeze(0).cuda()
-        
+    image = image.unsqueeze(0).to(device)
+
     ## get embeddings / logits
     with torch.no_grad():
         output = model(image)
@@ -121,10 +132,6 @@ def inference(
         model.use_projection_head(False)
         embeddings = output.detach().cpu().numpy().squeeze()  
         embeddings = np.float32(embeddings)
-        if standardize:
-            mean = np.mean(embeddings, axis=0)
-            std = np.std(embeddings, axis=0)
-            embeddings = (embeddings - mean) / std
         result = embeddings    
         
     elif stage=="second":
@@ -143,13 +150,33 @@ def cli():
         
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
-    parser.add_argument("--image", type=str, help="Path to image to embedd / classify.")
+    parser.add_argument("--path", type=str, help="Path to image or folder to embedd / classify.")
+    parser.add_argument("--save-path", type=str, default="bioencoder_results.csv", help="Path to CSV file with results.")
+    parser.add_argument("--overwrite", action='store_true', help="Overwrite CSV file with results.")
     args = parser.parse_args()
     
     inference_cli = utils.restore_config(inference)
-    result = inference_cli(args.config_path, image=args.image)
-    print(result)
     
+    if os.path.isdir(args.path):
+        if os.path.isfile(args.save_path) and not args.overwrite:
+            return f"{args.save_path} exists - (use --overwrite)"
+        file_name_list = os.listdir(args.path)
+        results_dict = {}
+        for file_name in tqdm(file_name_list, desc="Processing files"):
+            file_path = os.path.join(args.path, file_name)
+            results_dict[file_name] = inference_cli(args.config_path, image=file_path)
+        
+        data_results = pd.DataFrame.from_dict(results_dict, orient="index")
+        if len(list(data_results))==1:
+            data_results.rename(columns={0: "class"}, inplace=True)
+        data_results.reset_index(inplace=True)
+        data_results.rename(columns={"index": "image_name"}, inplace=True)
+        data_results.to_csv(args.save_path, index=False)
+        print(f"saved BioEncoder results to {args.save_path}")
+    elif os.path.isfile(args.path):
+        result = {os.path.basename(args.path): inference_cli(args.config_path, image=args.path)}
+        return result
+        
 if __name__ == "__main__":
     
     cli()

@@ -68,9 +68,6 @@ def interactive_plots(
     plot_style = hyperparams.get("plot_style", 1)
     point_size = hyperparams.get("point_size", 10)
 
-    ## init scaler
-    scaler = torch.cuda.amp.GradScaler()
-    
     ## set up dirs
     data_dir = os.path.join(root_dir,"data",  run_name)
     plot_dir = os.path.join(root_dir, "plots", run_name)
@@ -102,7 +99,7 @@ def interactive_plots(
     model.use_projection_head(False)
     model.eval()
     embeddings_train, labels_train = utils.compute_embeddings(
-        loaders["valid_loader"], model, scaler
+        loaders["valid_loader"], model
     )
     
     ## load dataset
