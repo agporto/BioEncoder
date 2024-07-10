@@ -7,4 +7,4 @@ model:
 
 img_size: 384 # Image size for training and validation
 
-standardize: false # Whether to apply standardization to the input images
+return_probs: false # Whether to return the probabilities for each class

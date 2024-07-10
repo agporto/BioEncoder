@@ -86,6 +86,7 @@ def train(
     num_workers = hyperparams["dataloaders"]["num_workers"]
     aug_sample = hyperparams["augmentations"].get("save_sample", False)
     aug_sample_n = hyperparams["augmentations"].get("sample_n", 5)
+    aug_sample_seed = hyperparams["augmentations"].get("seed", 42)
 
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
@@ -166,6 +167,8 @@ def train(
     scaler = torch.cuda.amp.GradScaler()
     if not amp:
         scaler = None
+        
+    ## set seed for entire pipeline
     utils.set_seed()
 
     # create model, loaders, optimizer, etc
@@ -185,8 +188,9 @@ def train(
         ckpt_pretrained=ckpt_pretrained,
     ).cuda()
     
+    ## save a sample of augmented images
     if aug_sample:
-        utils.save_augmented_sample(data_dir, transforms["train_transforms"], aug_sample_n)
+        utils.save_augmented_sample(data_dir, transforms["train_transforms"], aug_sample_n, seed=aug_sample_seed)
         logger.info(f"Saving augmentation samples: {aug_sample_n} per class to data/{run_name}/aug_sample")
 
     logger.info(f"Using backbone: {backbone}")

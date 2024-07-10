@@ -3,6 +3,7 @@
 
 import argparse
 import os 
+import numpy as np
 from PIL import Image
 
 import torch
@@ -72,6 +73,7 @@ def model_explorer(
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"]["num_classes"]
     stage = hyperparams["model"]["stage"]
+    device = hyperparams.get("device", "cuda")
 
     ## get swa path
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, "swa")
@@ -92,6 +94,9 @@ def model_explorer(
     # Image upload
     uploaded_file = st.sidebar.file_uploader("Upload an Image", type=["png", "jpg", "jpeg"])
 
+    ## get image transformations
+    transform = utils.get_transforms(hyperparams, valid=False)
+
     # Load the model and add to cache
     model = load_model(
         ckpt_pretrained, 
@@ -101,10 +106,18 @@ def model_explorer(
         )
 
     if uploaded_file is not None:
+        
+        ## load image
+        image = Image.open(uploaded_file)
+        
         # Display the uploaded image
-        image = Image.open(uploaded_file).convert('RGB')
         st.sidebar.image(image, caption="Input Image", use_column_width=True)
 
+        ## apply transforms and load into device
+        image = np.asarray(image)
+        image = transform(image=image)["image"]
+        image = image.unsqueeze(0).to(device)
+    
         # Generate visualizations
         selected = option_menu(None, vis_funcs, icons=['list' for _ in range(len(vis_funcs))], menu_icon="cast", orientation="horizontal")
         if selected == 'Filters':

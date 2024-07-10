@@ -52,7 +52,7 @@ def visualize_activations(model, module, img, max_acts = 64, save_path = None, d
         Plots the activations of a module recorded during a forward pass on an image
     """
     model.to(device)
-    img_t = preprocess_image(img).to(device)
+    # img_t = preprocess_image(img).to(device)
     acts = [0]
 
     def hook_fn(self, input, output):
@@ -87,7 +87,7 @@ def saliency_map(model, img, device = 'cuda', save_path = None):
 
     model.eval()
     model.to(device)    
-    img_t = preprocess_image(img).to(device)
+    # img_t = preprocess_image(img).to(device)
     img_t.requires_grad = True
     img_t.retain_grad() #added this line 
     
@@ -120,7 +120,7 @@ def grad_cam(model, module, img, target_layer = ["4"], target_category= None, de
     grad_cam = GradCam(model = model, feature_module = module,
                     target_layer_names = target_layer, use_cuda = use_cuda)
 
-    img_t = preprocess_image(img).to(device)
+    # img_t = preprocess_image(img).to(device)
         
     grayscale_cam = grad_cam(img_t, target_category)
 
@@ -167,7 +167,7 @@ def contrast_cam(model, module, img, target_layer = ["4"], target_category= None
     contrast_cam = ContrastCam(model = model, feature_module = module,
                     target_layer_names = target_layer, use_cuda = use_cuda)
 
-    img_t = preprocess_image(img).to(device)
+    # img_t = preprocess_image(img).to(device)
     
     assert(target_category != None), "Please specify a target category"
     grayscale_cam = contrast_cam(img_t, target_category)

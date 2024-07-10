@@ -10,7 +10,7 @@ from tqdm import tqdm
 from functools import wraps
 
 import torch
-from torchvision.transforms import ToPILImage
+from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import f1_score #, accuracy_score
@@ -21,7 +21,7 @@ from .schedulers import SCHEDULERS
 from .models import BioEncoderModel
 from .datasets import create_dataset
 from .augmentations import get_transforms
-
+from bioencoder.vis import helpers
 
 def save_yaml(dic, yaml_path):
     with open(yaml_path, 'w') as file:
@@ -104,6 +104,8 @@ def set_seed(seed=42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
+    
+    return seed
 
 
 def pprint_fill_hbar(message, symbol="-", ret=True):
@@ -321,7 +323,7 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
     return {"criterion": criterion, "optimizer": optimizer, "scheduler": scheduler, "loss_optimizer": loss_optimizer}
 
 
-def compute_embeddings(loader, model, scaler):
+def compute_embeddings(loader, model):
     """Computes the embeddings and corresponding labels for a dataset.
 
     Parameters:
@@ -339,11 +341,7 @@ def compute_embeddings(loader, model, scaler):
 
     for images, labels in loader:
         images = images.cuda()
-        if scaler:
-            with torch.cuda.amp.autocast():
-                embed = model(images)
-        else:
-            embed = model(images)
+        embed = model(images)
         if total_embeddings is None:
             total_embeddings = embed.detach().cpu()
             total_labels = labels.detach().cpu()
@@ -632,7 +630,7 @@ def copy_parameters_to_model(params, model):
             param.data.copy_(s_param.data)
 
 
-def save_augmented_sample(data_dir, transform, n_samples):
+def save_augmented_sample(data_dir, transform, n_samples, seed):
     """
     Save a sample of augmented images for each class.
 
@@ -646,6 +644,13 @@ def save_augmented_sample(data_dir, transform, n_samples):
     dataset = ImageFolder(root=os.path.join(data_dir, "train"))
     save_dir = os.path.join(data_dir, "aug_sample")
     os.makedirs(save_dir, exist_ok=True)
+
+    ## reverse image net transforms
+    postprocessing = transforms.Compose(
+    [
+        transforms.Normalize(mean=[0, 0, 0], std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
+        transforms.Normalize(mean=[-0.485, -0.456, -0.406], std=[1, 1, 1]),
+    ])
 
     # Organize samples by class
     class_to_indices = defaultdict(list)
@@ -665,8 +670,8 @@ def save_augmented_sample(data_dir, transform, n_samples):
             image = Image.open(path)
             image_name = os.path.basename(path)
             augmented_image = transform(image=np.asarray(image))["image"]   
-            to_pil_image = ToPILImage()
-            augmented_image = to_pil_image(augmented_image)
+            to_pil_image = transforms.ToPILImage()
+            augmented_image = to_pil_image(postprocessing(augmented_image))
             sample_path = os.path.join(save_dir, f"{class_label_str}_{image_name}_augmented.png")
             augmented_image.save(sample_path)
 
