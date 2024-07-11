@@ -14,6 +14,7 @@ configs/train/train_effnetb4_damselfly_stage1_scarcface.yml
 cosine.csv
 app.py
 biosupcon/vis/methods_backup.py
+*.kate-swp
 
 ## python stuff
 bin
