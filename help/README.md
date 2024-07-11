@@ -9,3 +9,5 @@ Check the articles below to learn more about the different steps:
 [3. Training](03-training.md)
 
 [4. Visualization and model exploration](04-analysis.md)
+
+[5. Options for configuration files](05-options.md)
