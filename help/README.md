@@ -1,6 +1,6 @@
 # Help files
 
-Check the articles below to learn more about the different steps:
+Refer to the articles below to learn more about installaion, the different steps in the pipeline, or options for training:
 
 [1. Installation](01-installation.md)
 
