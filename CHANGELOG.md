@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+- bugfix: export agumentations
+- improved CLI inference script (better performance: model gets cached)
+- better documentation in the repo and the config files
+
 ## 0.3.0
 - added inference script: extract embeddings from single image
 - added parameter to show samples of image augmentations, and an argument to do a training dry run
