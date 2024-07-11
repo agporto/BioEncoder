@@ -1,8 +1,19 @@
 # Options
 
+Below are the currently available options for model backbones, losses, optimizers, schedulers, and augmentations. Since models and augmentation definitions are provided through third party packages (timm and albumenations), we refer to their documnetation.
+
 ## Models
 
-- timm -> link (or options fun)
+All models listed in the [timm GitHub repo](https://github.com/huggingface/pytorch-image-models/blob/main/results/results-imagenet.csv) are available for use as model backbones.
+
+You can also list models directly via the [timm API](https://timm.fast.ai/models):
+
+```python
+
+import timm
+timm.list_models()[:5]
+
+```
 
 ## Losses
 
