@@ -71,7 +71,7 @@ bioencoder.swa(config_path=r"bioencoder_configs/swa_stage2.yml")
 bioencoder.model_explorer(config_path=r"bioencoder_configs/explore_stage2.yml")
 
 ## inference (stage 1 = embeddings, stage 2 = classification)
-bioencoder.inference(config_path="bioencoder_configs/inference.yml", image="path/to/image.jpg")
+bioencoder.inference(config_path="bioencoder_configs/inference.yml", image="path/to/image.jpg" / np.array)
 
 ```
 4\. Alternatively, you can directly use the command line interface: 
@@ -89,7 +89,7 @@ bioencoder_lr_finder --config-path "bioencoder_configs/lr_finder.yml"
 bioencoder_train --config-path "bioencoder_configs/train_stage2.yml"
 bioencoder_swa --config-path "bioencoder_configs/swa_stage2.yml"
 bioencoder_model_explorer --config-path "bioencoder_configs/explore_stage2.yml"
-bioencoder_inference --config-path "bioencoder_configs/inference.yml" --image "path/to/image.jpg"
+bioencoder_inference --config-path "bioencoder_configs/inference.yml" --path "path/to/image.jpg"
 
 ```
 
