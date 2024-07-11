@@ -4,7 +4,7 @@
 
 # BioEncoder
 
-BioEncoder is a tool box for image classification and trait discovery in organismal biology. It relies on image classification models trained using metric learning to learn species trait data  (i.e., features) from images. This implementation is based on [SupCon](https://github.com/ivanpanshin/SupCon-Framework) and [timm-vis](https://github.com/novice03/timm-vis). 
+BioEncoder is an toolkit that leverages supervised metric learning to i) learn features from images, ii) enhance biological image classification, annd iii) identify the feature most relevant to classification. Designed for diverse and complex datasets, the package and the available metric losses can handles unbalanced classes and subtle phenotypic differences more effectively than non-metric approaches. The package includes data loaders, custom augmentation techniques, hyperparameter tuning through YAML configuration files, and rich model visualizations, providing a comprehensive solution for high-throughput analysis of biological images.
 
 Preprint on BioRxiv: [https://doi.org/10.1101/2024.04.03.587987]( https://doi.org/10.1101/2024.04.03.587987)
 
@@ -20,7 +20,7 @@ Preprint on BioRxiv: [https://doi.org/10.1101/2024.04.03.587987]( https://doi.or
 - Easy customization of hyperparameters, including augmentations, through `YAML` configs (check the [config-templates](config-templates) folder for examples)
 - Custom augmentations techniques via [albumentations](https://github.com/albumentations-team/albumentations)
 - TensorBoard logs and checkpoints (soon to come: WandB integration)
-- Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391))
+- Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391) and [timm-vis](https://github.com/novice03/timm-vis/blob/main/details.ipynb))
 - Interactive [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) and [PCA](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html) plots using [Bokeh](https://bokeh.org/)
 
 <div align="center">
