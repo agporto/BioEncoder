@@ -2,6 +2,7 @@ import cv2
 import importlib
 import random
 import os
+import shutil
 import numpy as np
 import yaml
 from collections import defaultdict
@@ -643,6 +644,7 @@ def save_augmented_sample(data_dir, transform, n_samples, seed):
     # Load dataset
     dataset = ImageFolder(root=os.path.join(data_dir, "train"))
     save_dir = os.path.join(data_dir, "aug_sample")
+    shutil.rmtree(save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
     ## reverse image net transforms

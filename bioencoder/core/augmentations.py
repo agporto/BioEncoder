@@ -15,7 +15,8 @@ def get_transforms(config, valid=False):
     """
     default_size = 224
     img_size = config.get('img_size', default_size)
-    aug = get_aug_from_config(config.get('augmentations', {}).get('transforms', []))
+    config_aug = config.get('augmentations', {})
+    aug = get_aug_from_config(config_aug.get('transforms', []))
 
     return A.Compose([
         A.Resize(img_size, img_size, always_apply=True),
@@ -64,3 +65,36 @@ def get_aug_from_config(config):
         return getattr(A, name)(*args, **config)
     
     
+# def get_aug_from_config2(config_aug):
+#     """
+#     A helper function to create image augmentation pipeline based on a given config_auguration.
+    
+#     Parameters:
+#         config_aug (str, list, or dict): A string, list of strings, or dictionary representing the augmentation pipeline.
+    
+#     Returns:
+#         aug (albumentations.augmentations.transforms): The constructed augmentation pipeline.
+#     """
+#     config_aug = copy.deepcopy(config_aug)
+
+#     if config_aug is None:
+#         return A.NoOp()
+    
+#     elif isinstance(config_aug, dict):
+    
+#         compose = config_aug.get("compose", {
+#             "name": "Sequential",
+#             "p1": 1})
+          
+#         transforms_inst = getattr(A, compose["name"])
+#         transforms_inst(parse_transforms(config_aug.get("transforms", {})), p=compose["p1"])
+        
+
+# def parse_transforms(transforms):
+#     transforms_list = []
+#     for trans in transforms:
+#         name = list(trans.keys())[0]
+#         params = trans.get(name, {})
+#         transforms_list.append(getattr(A, name)(**params))
+        
+#     return transforms_list
