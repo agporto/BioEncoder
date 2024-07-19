@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0
+- NEW: tested with py310 and py311
+- bugfix: model-explorer was broken due to internal code refactoring
+- bugfix: config files had faulty defaults
+
 ## 0.3.1
 - bugfix: export agumentations
 - improved CLI inference script (better performance: model gets cached)
