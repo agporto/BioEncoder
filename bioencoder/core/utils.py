@@ -324,7 +324,7 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
     return {"criterion": criterion, "optimizer": optimizer, "scheduler": scheduler, "loss_optimizer": loss_optimizer}
 
 
-def compute_embeddings(loader, model):
+def compute_embeddings(loader, model, scaler=None):
     """Computes the embeddings and corresponding labels for a dataset.
 
     Parameters:
@@ -342,7 +342,11 @@ def compute_embeddings(loader, model):
 
     for images, labels in loader:
         images = images.cuda()
-        embed = model(images)
+        if scaler:
+            with torch.cuda.amp.autocast():
+                embed = model(images)
+        else:
+            embed = model(images)
         if total_embeddings is None:
             total_embeddings = embed.detach().cpu()
             total_labels = labels.detach().cpu()
@@ -644,7 +648,8 @@ def save_augmented_sample(data_dir, transform, n_samples, seed):
     # Load dataset
     dataset = ImageFolder(root=os.path.join(data_dir, "train"))
     save_dir = os.path.join(data_dir, "aug_sample")
-    shutil.rmtree(save_dir)
+    if os.path.isdir(save_dir):
+        shutil.rmtree(save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
     ## reverse image net transforms

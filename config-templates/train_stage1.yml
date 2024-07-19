@@ -31,7 +31,7 @@ criterion:
   params:
     temperature: 0.1 # Temperature parameter for contrastive loss
 
-img_size: 384 # Image size for training and validation
+img_size: &size 384  # Image size for training and validation
 
 augmentations: # augmentations to be applied - see https://github.com/agporto/BioEncoder/blob/main/help/05-options.md#augmentations
   sample_save: True # Whether to save a sample of augmented images
@@ -39,6 +39,9 @@ augmentations: # augmentations to be applied - see https://github.com/agporto/Bi
   sample_seed: 42 # Seed for random sample
   transforms: 
     - RandomResizedCrop: # Randomly resize and crop the image
+        height: *size
+        width: *size
+        scale:  !!python/tuple [0.7,1]
     - Flip: # Randomly flip the image horizontally
     - RandomRotate90: # Randomly rotate the image by 90 degrees
     - MedianBlur: # Apply median blur with a probability

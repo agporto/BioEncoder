@@ -10,7 +10,7 @@ authors = [
 	]
 description = "A metric learning toolkit"
 readme = "README.md"
-requires-python = "==3.9.*"
+requires-python = ">=3.9"
 keywords = ["metric learning", "biology"]
 dynamic = ["dependencies"]
 version = "0.3.1"

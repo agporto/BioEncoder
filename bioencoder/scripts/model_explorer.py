@@ -71,9 +71,8 @@ def model_explorer(
     
     ## parse config
     backbone = hyperparams["model"]["backbone"]
-    num_classes = hyperparams["model"]["num_classes"]
+    num_classes = hyperparams["model"].get("num_classes", None)
     stage = hyperparams["model"]["stage"]
-    device = hyperparams.get("device", "cuda")
 
     ## get swa path
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, "swa")
@@ -106,18 +105,10 @@ def model_explorer(
         )
 
     if uploaded_file is not None:
-        
-        ## load image
-        image = Image.open(uploaded_file)
-        
         # Display the uploaded image
+        image = Image.open(uploaded_file).convert('RGB')
         st.sidebar.image(image, caption="Input Image", use_column_width=True)
 
-        ## apply transforms and load into device
-        image = np.asarray(image)
-        image = transform(image=image)["image"]
-        image = image.unsqueeze(0).to(device)
-    
         # Generate visualizations
         selected = option_menu(None, vis_funcs, icons=['list' for _ in range(len(vis_funcs))], menu_icon="cast", orientation="horizontal")
         if selected == 'Filters':
@@ -154,7 +145,6 @@ def model_explorer(
             target = st.selectbox("Select a target", class_names)
             result = vis.contrast_cam(model, model.encoder,image,target_layer=[layer], target_category=class_names.index(target))
             st.pyplot(result)
-        
 
 
 if __name__ == "__main__":
