@@ -36,8 +36,7 @@ Preprint on BioRxiv: [https://doi.org/10.1101/2024.04.03.587987]( https://doi.or
 pip install bioencoder
 ````
 
-2\. Download example dataset from the data repo: [https://zenodo.org/records/10909614/files/BioEncoder-data.zip](https://zenodo.org/records/10909614/files/BioEncoder-data.zip?download=1&preview=1). 
-This archive contains the images and configuration files needed for step 3/4, as well as the final model checkpoints and a script to reproduce the results and figures presented in the paper. To play around with the interactive figures and the model explorer you can also skip the training / SWA steps. 
+2\. Get the [example dataset from the data repo](https://zenodo.org/records/13017212/files/BioEncoder-dataset.zip?download=1) and the config files by [downloading the git repo](https://github.com/agporto/BioEncoder/archive/refs/heads/main.zip), and extract both. 
 
 3\. Start interactive session (e.g., in Spyder or VS code) and run the following commands one by one:
 
@@ -46,13 +45,13 @@ This archive contains the images and configuration files needed for step 3/4, as
 
 import bioencoder
 
-## global setup
-bioencoder.configure(root_dir=r"~/bioencoder_wd", run_name="v1")
+## global setup (pick a target directory for all output that bioencoder generates, e.g. training dataset, model weights, etc.)
+bioencoder.configure(root_dir=r"bioencoder_wd", run_name="v1")
 
-## split dataset
-bioencoder.split_dataset(image_dir=r"~/Downloads/damselflies-aligned-trai_val", max_ratio=6, random_seed=42, val_percent=0.1, min_per_class=20)
+## split dataset (the dataset you downloaded)
+bioencoder.split_dataset(image_dir=r"damselflies-aligned-trai_val", max_ratio=6, random_seed=42, val_percent=0.1, min_per_class=20)
 
-## train stage 1
+## train stage 1 
 bioencoder.train(config_path=r"bioencoder_configs/train_stage1.yml")
 bioencoder.swa(config_path=r"bioencoder_configs/swa_stage1.yml")
 
@@ -80,7 +79,7 @@ bioencoder.inference(config_path="bioencoder_configs/inference.yml", image="path
 ## use the flag "--overwrite" to redo a step
 
 bioencoder_configure --root-dir "~/bioencoder_wd" --run-name v1
-bioencoder_split_dataset --image-dir "~/Downloads/damselflies-aligned-trai_val" --max-ratio 6 --random-seed 42
+bioencoder_split_dataset --image-dir "damselflies-aligned-trai_val" --max-ratio 6 --random-seed 42
 bioencoder_train --config-path "bioencoder_configs/train_stage1.yml"
 bioencoder_swa --config-path "bioencoder_configs/swa_stage1.yml"
 bioencoder_interactive_plots --config-path "bioencoder_configs/plot_stage1.yml"
