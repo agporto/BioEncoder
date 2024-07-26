@@ -37,7 +37,7 @@ pip install bioencoder
 ````
 
 2\. Download example dataset from the data repo: [https://zenodo.org/records/10909614/files/BioEncoder-data.zip](https://zenodo.org/records/10909614/files/BioEncoder-data.zip?download=1&preview=1). 
-This archive contains the images and configuration files needed for step 3/4, as well as the final model checkpoints and a script to reproduce the results and figures presented in the paper. To play around with theinteractive figures and the model explorer you can also skip the training / SWA steps. 
+This archive contains the images and configuration files needed for step 3/4, as well as the final model checkpoints and a script to reproduce the results and figures presented in the paper. To play around with the interactive figures and the model explorer you can also skip the training / SWA steps. 
 
 3\. Start interactive session (e.g., in Spyder or VS code) and run the following commands one by one:
 
