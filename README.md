@@ -98,16 +98,20 @@ Please cite BioEncoder as follows:
 
 ```bibtex
 
-@UNPUBLISHED{Luerig2024-ov,
-  title    = "{BioEncoder}: a metric learning toolkit for comparative
-              organismal biology",
-  author   = "Luerig, Moritz D and Di Martino, Emanuela and Porto, Arthur",
-  journal  = "bioRxiv",
-  pages    = "2024.04.03.587987",
-  month    =  apr,
-  year     =  2024,
-  language = "en",
-  doi      = "10.1101/2024.04.03.587987"
+@article{https://doi.org/10.1111/ele.14495,
+author = {Lürig, Moritz D. and Di Martino, Emanuela and Porto, Arthur},
+title = {BioEncoder: A metric learning toolkit for comparative organismal biology},
+journal = {Ecology Letters},
+volume = {27},
+number = {8},
+pages = {e14495},
+keywords = {biodiversity, deep metric learning, feature space, machine learning, phenotypic differences, python package, species identification},
+doi = {https://doi.org/10.1111/ele.14495},
+url = {https://onlinelibrary.wiley.com/doi/abs/10.1111/ele.14495},
+eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1111/ele.14495},
+year = {2024}
 }
+
+
 
 ```
