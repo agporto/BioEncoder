@@ -6,9 +6,9 @@
 
 BioEncoder is a toolkit for supervised metric learning to i) learn and extract features from images, ii) enhance biological image classification, and iii) identify the features most relevant to classification. Designed for diverse and complex datasets, the package and the available metric losses can handle unbalanced classes and subtle phenotypic differences more effectively than non-metric approaches. The package includes taxon-agnostic data loaders, custom augmentation techniques, hyperparameter tuning through YAML configuration files, and rich model visualizations, providing a comprehensive solution for high-throughput analysis of biological images.
 
-Preprint on BioRxiv: [https://doi.org/10.1101/2024.04.03.587987]( https://doi.org/10.1101/2024.04.03.587987)
+Read the paper: [https://onlinelibrary.wiley.com/doi/10.1111/ele.14495](https://onlinelibrary.wiley.com/doi/10.1111/ele.14495)
 
-## Features
+## Functionality
 
 [>> Full list of available model architectures, losses, optimizers, schedulers, and augmentations <<](https://github.com/agporto/BioEncoder/blob/main/help/05-options.md)
 
