@@ -6,21 +6,21 @@ Steps 2 and 3 give you more fine control over which CUDA and matching pytorch ve
 
 1\. Create a clean virtual environment 
 ```
-mamba create -n bioencoder python=3.9
+mamba create -n bioencoder python=3.11 #we tested BioeEcoder with Python 3.9 - 3.11
 mamba activate bioencoder
 ```
 
-2\. Install CUDA - e.g.:
+2\. Install the CUDA toolkit (just an example, you can use different versions):
 ```
-mamba install cuda-toolkit==12.1*
-```
-
-3\. Install pytorch (check https://pytorch.org/get-started/locally/) - e.g.:
-```
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+mamba install cuda-toolkit==12.6.3
 ```
 
-4\. Install bioencoder from pypi:
+3\. Install pytorch (needs to match your CUDA toolkit version - check https://pytorch.org/get-started/locally/) - e.g.:
+```
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+```
+
+4\. Install bioencoder:
 ````
 pip install bioencoder
 ````
