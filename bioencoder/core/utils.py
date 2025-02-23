@@ -108,9 +108,14 @@ def set_seed(seed=42):
     
     return seed
 
-
 def pprint_fill_hbar(message, symbol="-", ret=True):
-    terminal_width = os.get_terminal_size()[0] - len("%Y-%m-%d %H:%M:%S")
+    try:
+        # Try to get the terminal width
+        terminal_width = os.get_terminal_size()[0] - len("%Y-%m-%d %H:%M:%S")
+    except OSError:
+        # Fallback width for headless environments
+        terminal_width = 80  # Default width if terminal size can't be determined
+
     message_length = len(message)
 
     if message_length >= terminal_width:

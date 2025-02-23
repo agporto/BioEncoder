@@ -75,7 +75,12 @@ def inference(
         ckpt_pretrained = checkpoint_path
     else:    
         ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, checkpoint)
-
+        
+    ## load from config
+    if root_dir and run_name:
+        train_dir = os.path.join(root_dir,"data",  run_name, "train")
+        labels_sorted = ImageFolder(root=train_dir).classes
+        
     ## set random seed
     utils.set_seed()
 
@@ -99,26 +104,14 @@ def inference(
         
     ## set to eval
     model.eval()
-
-    ## get labels
-    train_dir = os.path.join(root_dir,"data",  run_name, "train")
-    labels_sorted = ImageFolder(root=train_dir).classes
          
     ## load file
     if isinstance(image, str):
-        if os.path.isfile(image):
-            image = Image.open(image)
-            image = np.asarray(image)
-        else:
-            print("File does not exist")
-            return
-    elif isinstance(image, (np.ndarray, np.generic)):
-        print("image shape:" + str(image.shape))
-        # Input is already a numpy array or an instance of np.generic (which np.ndarray inherits from)
-        pass
-    else:
-        print("Wrong format - need either image path or array type")
-        return
+        if not os.path.isfile(image):
+            raise FileNotFoundError(f"File does not exist: {image}")
+        image = np.asarray(Image.open(image))
+    elif not isinstance(image, (np.ndarray, np.generic)):
+        raise TypeError("Input must be either an image path (str) or a NumPy array.")
     
     ## transform image and move to GPU
     image = transform(image=image)["image"]
