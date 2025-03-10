@@ -67,6 +67,7 @@ def interactive_plots(
     color_map = hyperparams.get("color_map", "jet")
     plot_style = hyperparams.get("plot_style", 1)
     point_size = hyperparams.get("point_size", 10)
+    perplexity = hyperparams.get("perplexity", None)
 
     ## set up dirs
     data_dir = os.path.join(root_dir,"data",  run_name)
@@ -114,8 +115,10 @@ def interactive_plots(
         ]
         return pd.concat([df, pd.DataFrame(embeddings_train)], axis=1)
     
+    ## reduce dimensionality
+    perplexity = perplexity if perplexity else min(100, len(embeddings_train) // 2)
     reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(
-        embeddings_train
+        embeddings_train, perplexity
     )       
     df = pd.DataFrame(reduced_data, columns=colnames)
     df["paths"] = [ os.path.join("..", "..", item) for item in rel_paths_train]
