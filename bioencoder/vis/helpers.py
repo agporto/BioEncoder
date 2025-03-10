@@ -214,7 +214,7 @@ def feature_map_normalization(f):
     act_map /= act_map.max()
     return act_map
 
-def embbedings_dimension_reductions(data_table):
+def embbedings_dimension_reductions(data_table, perplexity):
     """
     Perform dimension reduction on the input data.
 
@@ -231,7 +231,7 @@ def embbedings_dimension_reductions(data_table):
     norm_data = (data_table - mean) / std
     pca_obj = decomposition.PCA(n_components=2)
     pca = pca_obj.fit_transform(norm_data)
-    tsne = manifold.TSNE(learning_rate='auto', init='pca').fit_transform(norm_data)
+    tsne = manifold.TSNE(perplexity=perplexity, learning_rate='auto', init='pca').fit_transform(norm_data)
     names = ['PC1', 'PC2', 'tSNE-0', 'tSNE-1']
     return np.hstack((pca, tsne)), names, pca_obj
 
