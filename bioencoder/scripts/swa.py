@@ -112,7 +112,7 @@ def swa(
 
     if stage == "first":
         valid_metrics = utils.validation_constructive(
-            loaders["valid_loader"], loaders["train_features_loader"], model, scaler
+            loaders["valid_loader"], loaders["train_loader"], model, scaler
         )
     else:
         valid_metrics = utils.validation_ce(

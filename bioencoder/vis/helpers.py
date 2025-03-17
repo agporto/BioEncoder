@@ -1,3 +1,6 @@
+
+#%% imports
+
 import numpy as np
 import pandas as pd
 import cv2
@@ -5,14 +8,17 @@ import torch
 from torchvision import transforms
 from sklearn import decomposition, manifold
 import matplotlib.pyplot as plt
-from bokeh.models import (LassoSelectTool, PanTool,
-                          ResetTool, Div, CustomJS, 
-                          HoverTool, WheelZoomTool)
-TOOLS = [LassoSelectTool, PanTool, WheelZoomTool, ResetTool]
-from bokeh.models import ColumnDataSource
+from bokeh.models import (LassoSelectTool, PanTool,ResetTool, Div, CustomJS, HoverTool, WheelZoomTool,
+                          ColumnDataSource, Legend, LegendItem)
 from bokeh import plotting as bplot
+from bokeh.transform import factor_mark
 from bokeh.io import show
 from bokeh import layouts
+
+TOOLS = [LassoSelectTool, PanTool, WheelZoomTool, ResetTool]
+
+
+#%% functions
 
 
 def preprocess_image(img):
@@ -236,7 +242,7 @@ def embbedings_dimension_reductions(data_table, perplexity):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, plot_style=1, 
+def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None, plot_style=1, 
                point_size=10, **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
@@ -256,18 +262,25 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, pl
     
     if not all(col in df.columns for col in ['paths', 'class']):
         raise ValueError("The dataframe must have columns 'paths' and 'class'")      
-        
-    df['image_files'] =  df['paths']
-    
-    ## color management
+   
+    unique_classes = df['class'].unique()
+ 
+   
+    ## Color management
     if color_classes:
+        assert len(unique_classes) == len(color_classes), (
+            f"Number of classes is {len(unique_classes)}, but only {len(color_classes)} colors provided."
+        )
+
+        # Convert dict to DataFrame and merge colors
         df_col = pd.DataFrame.from_dict(color_classes.items())
-        df_col.columns = ["class_str","color"]
-        df = df.merge(df_col)
+        df_col.columns = ["class_str", "color"]
+        df = df.merge(df_col, how="left", left_on="class", right_on="class_str").drop(columns=["class_str"])
+
     else:
-        num_classes = len(df['class'].unique())
-        cmap=plt.cm.get_cmap(color_map, num_classes)
-        colors_raw = cmap((df['class']), bytes=True)
+        num_classes = len(unique_classes)
+        cmap = plt.cm.get_cmap(color_map, num_classes)
+        colors_raw = cmap(df['class'], bytes=True)
         colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
         df['color'] = colors_str
         
@@ -279,7 +292,7 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, pl
         <div>
             <div>
                 <img
-                src="@image_files" height="192" alt="image"
+                src="@paths" height="192" alt="image"
                 style="float: left; margin: 0px 15px 15px 0px; image-rendering: pixelated;"
                 border="2"
                 ></img>
@@ -312,8 +325,8 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, pl
             const indices = hit_test_result.indices;
             if (indices.length > 0) {
                 div.text = `<img 
-                src="${ds.data['image_files'][indices[0]]}"
-                style="float: left; margin: 0px 15px 15px 0px; max-width: 650px; max-height: 650px; width: auto; height: auto;"
+                src="${ds.data['paths'][indices[0]]}"
+                style="float: left; margin: 0px 15px 15px 0px; max-width: 650px; max-height: 500px; width: auto; height: auto;"
                 border="2"
                 />`;
             }

@@ -46,94 +46,90 @@ def interactive_plots(
 
     """
         
-    ## load bioencoer config
-    root_dir = config.root_dir
-    run_name = config.run_name
-    
-    ## load config
+    ## Load Bioencoder config
+    root_dir, run_name = config.root_dir, config.run_name
     hyperparams = utils.load_yaml(config_path)
     
-    ## parse config
+    ## Parse config
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"].get("num_classes", None)
     checkpoint = hyperparams["model"].get("checkpoint", "swa")
-    stage = hyperparams["model"].get("stage", "first")
-    batch_sizes = {
-        "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
-        "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
-    }
-    num_workers = hyperparams["dataloaders"]["num_workers"]
-    color_classes = hyperparams.get("color_classes", None)
-    color_map = hyperparams.get("color_map", "jet")
-    plot_style = hyperparams.get("plot_style", 1)
-    point_size = hyperparams.get("point_size", 10)
-    perplexity = hyperparams.get("perplexity", None)
-
-    ## set up dirs
-    data_dir = os.path.join(root_dir,"data",  run_name)
-    plot_dir = os.path.join(root_dir, "plots", run_name)
-    os.makedirs(plot_dir, exist_ok=True)
+    stage = hyperparams.get("model", {}).get("stage", "first")
     
-    ## plot path
-    plot_path = os.path.join(plot_dir, f"embeddings_{run_name}.html")
+    batch_sizes = {
+        "train_batch_size": hyperparams.get("dataloaders", {}).get("train_batch_size"),
+        "valid_batch_size": hyperparams.get("dataloaders", {}).get("valid_batch_size",1),
+    }
+    num_workers = hyperparams.get("dataloaders", {}).get("num_workers", 4)
+    perplexity = hyperparams.get("perplexity", 30)
+
+    plot_config = {
+        "color_classes": hyperparams.get("color_classes", None),
+        "color_map": hyperparams.get("color_map", "jet"),
+        "plot_style": hyperparams.get("plot_style", 1),
+        "point_size": hyperparams.get("point_size", 10),
+    }
+    
+    
+    ## Set up directories
+    data_dir = os.path.join(root_dir, "data", run_name)
+    plot_path = os.path.join(root_dir, "plots", run_name, f"embeddings_{run_name}.html")
     if not overwrite and not kwargs.get("ret_embeddings"):
         assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
     
-    ## load weights
+    ## Load model and set up
     print(f"Checkpoint: using {checkpoint} of {stage} stage")
-    ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, checkpoint)
-
-    ## set random seed
+    ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, checkpoint)
     utils.set_seed()
-
-    ## extract embeddings
     transforms = utils.build_transforms(hyperparams)
-    loaders = utils.build_loaders(
-        data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second")
-    )
-    model = utils.build_model(
-        backbone,
-        second_stage=(stage == "second"),
-        num_classes=num_classes,
-        ckpt_pretrained=ckpt_pretrained,
-    ).cuda()
+    loaders = utils.build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second"))
+    model = utils.build_model(backbone, second_stage=(stage == "second"), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
     model.use_projection_head(False)
     model.eval()
-    embeddings_train, labels_train = utils.compute_embeddings(
-        loaders["valid_loader"], model
-    )
     
-    ## load dataset
-    rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs]
-       
-    ## return embeddings without plotting
+    ## Determine which embeddings to compute
+    embeddings, labels, rel_paths = [], [], []
+    
+    ## val batch size cant be zero
+    embeddings_val, labels_val = utils.compute_embeddings(loaders["valid_loader"], model)
+    if len(embeddings_val) < len(loaders["valid_loader"].dataset.imgs):
+        missed_imgs = len(loaders["valid_loader"].dataset.imgs) - len(embeddings_val)
+        print(f"Warning: missed {missed_imgs} images because batch size was not a multiple of validation dataset size.")
+    rel_paths_val = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs[:len(embeddings_val)]]
+    embeddings.extend(embeddings_val)
+    labels.extend(labels_val)
+    rel_paths.extend(rel_paths_val)
+    
+    ## train set embeddings
+    if batch_sizes["train_batch_size"] is not None:
+        embeddings_train, labels_train = utils.compute_embeddings(loaders["train_loader"], model)
+        if len(embeddings_train) < len(loaders["train_loader"].dataset.imgs):
+            missed_imgs = len(loaders["train_loader"].dataset.imgs) - len(embeddings_train)
+            print(f"Warning: missed {missed_imgs} images because batch size was not a multiple of training dataset size.")
+        rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["train_loader"].dataset.imgs[:len(embeddings_train)]]
+        embeddings.extend(embeddings_train)
+        labels.extend(labels_train)
+        rel_paths.extend(rel_paths_train)
+    
+    ## Return embeddings without plotting
     if kwargs.get("ret_embeddings"):
+        df = pd.DataFrame({"image_name": [os.path.basename(p) for p in rel_paths], "class": [os.path.basename(os.path.dirname(p)) for p in rel_paths]})
+        return pd.concat([df, pd.DataFrame(embeddings)], axis=1)
         
-        df = pd.DataFrame([os.path.basename(item) for item in rel_paths_train], columns=["image_name"])
-        df["class"] = [
-            os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
-        ]
-        return pd.concat([df, pd.DataFrame(embeddings_train)], axis=1)
+    ## Reduce dimensionality
+    if not perplexity:
+        perplexity = min(100, len(embeddings) // 2)
+        print(f"tSNE: using a perplexity value of {perplexity}")
+    reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(embeddings, perplexity)
     
-    ## reduce dimensionality
-    perplexity = perplexity if perplexity else min(100, len(embeddings_train) // 2)
-    reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(
-        embeddings_train, perplexity
-    )       
+    ## make plot
     df = pd.DataFrame(reduced_data, columns=colnames)
-    df["paths"] = [ os.path.join("..", "..", item) for item in rel_paths_train]
-    df["class"] = labels_train
-    df["class_str"] = [
-        os.path.basename(os.path.dirname(item[0])) for item in loaders["valid_loader"].dataset.imgs
-    ]
-    
-    ## check if color matches n classes
-    if color_classes:
-        assert len(np.unique(labels_train)) == len(color_classes), f"Number of classes is {len(np.unique(labels_train))}, but you only provided {len(color_classes)} colors"
-    
-    helpers.bokeh_plot(df, out_path=plot_path, color_map=color_map, color_classes=color_classes, 
-                       plot_style=plot_style, point_size=point_size)
-    
+    df["paths"] = [os.path.join("..", "..", p) for p in rel_paths]
+    df["class"], df["class_str"] = labels, [os.path.basename(os.path.dirname(p)) for p in rel_paths]
+    df["dataset"] = df["paths"].apply(lambda x: "validation" if "/val/" in x else "train")
+        
+    helpers.bokeh_plot(df, out_path=plot_path, **plot_config)
+
     
 def cli():
         

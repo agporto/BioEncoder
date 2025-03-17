@@ -118,7 +118,7 @@ def lr_finder(
         optim["scheduler"],
     )
     lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
-    lr_finder.range_test(loaders["train_features_loader"], end_lr=1, num_iter=num_iter)
+    lr_finder.range_test(loaders["train_loader"], end_lr=1, num_iter=num_iter)
 
     fig, ax = plt.subplots()
     ax, lr = lr_finder.plot(ax=ax, skip_start=skip_start, skip_end=skip_end)
