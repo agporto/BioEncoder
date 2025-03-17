@@ -16,7 +16,7 @@ def split_dataset(
         image_dir, 
         mode="flat",
         val_percent=0.1, 
-        max_ratio=7,
+        max_ratio=10,
         min_per_class=20,
         random_seed=42,
         dry_run=False,
@@ -205,11 +205,11 @@ def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image-dir", type=str, help="Path to the images directory sorted into class-specific subfolders.")
     parser.add_argument("--mode", type=str, choices=['flat', 'random', 'fixed'], default='flat', help="Type of dataset split to perform.")
-    parser.add_argument("--val_percent", type=float, default=0.1, help="Percentage of data to use as validation set.")
-    parser.add_argument("--max_ratio", type=int, default=7, help="Maximum ratio between the most and least abundant classes.")
-    parser.add_argument("--min_per_class", type=int, default=20, help="Minimum number of images per class.")
-    parser.add_argument("--random_seed", type=int, default=42, help="Seed for random number generator.")
-    parser.add_argument("--dry_run", action='store_true', help="Run without making any changes.")
+    parser.add_argument("--val-percent", type=float, default=0.1, help="Percentage of data to use as validation set.")
+    parser.add_argument("--max-ratio", type=int, default=7, help="Maximum ratio between the most and least abundant classes.")
+    parser.add_argument("--min-per-class", type=int, default=20, help="Minimum number of images per class.")
+    parser.add_argument("--random-seed", type=int, default=42, help="Seed for random number generator.")
+    parser.add_argument("--dry-run", action='store_true', help="Run without making any changes.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
     

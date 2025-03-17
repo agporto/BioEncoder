@@ -219,7 +219,7 @@ def train(
         optim["loss_optimizer"],
     )
     if ema:
-        iters = len(loaders["train_features_loader"])
+        iters = len(loaders["train_loader"])
         ema_decay = ema_decay_per_epoch ** (1 / iters)
         ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
 
@@ -244,7 +244,7 @@ def train(
                 )
             else:
                 train_metrics = utils.train_epoch_ce(
-                    loaders["train_features_loader"],
+                    loaders["train_loader"],
                     model,
                     criterion,
                     optimizer,
@@ -261,7 +261,7 @@ def train(
     
             if stage == "first":
                 valid_metrics_projection_head = utils.validation_constructive(
-                    loaders["valid_loader"], loaders["train_features_loader"], model, scaler
+                    loaders["valid_loader"], loaders["train_loader"], model, scaler
                 )
                 
                 ## check for GPU parallelization
@@ -270,7 +270,7 @@ def train(
                 #model_copy.use_projection_head(False)
                 model.use_projection_head(False)
                 valid_metrics_encoder = utils.validation_constructive(
-                    loaders["valid_loader"], loaders["train_features_loader"], model, scaler
+                    loaders["valid_loader"], loaders["train_loader"], model, scaler
                 )
                 model.use_projection_head(True)
                 #model_copy.use_projection_head(True)    parser.add_argument("--dry_run", action='store_true', help="Run without making any changes.")

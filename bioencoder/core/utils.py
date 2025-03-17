@@ -227,13 +227,13 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
         second_stage=True
     )
 
-    train_features_loader = torch.utils.data.DataLoader(
+    train_loader = torch.utils.data.DataLoader(
         train_features_dataset, 
         batch_size=batch_sizes['train_batch_size'], 
         shuffle=True,
         num_workers=num_workers, 
         pin_memory=True, 
-        drop_last=True
+        drop_last=(batch_sizes['train_batch_size'] is not None)
     )
         
     valid_loader = torch.utils.data.DataLoader(
@@ -242,11 +242,11 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
         shuffle=False,
         num_workers=num_workers, 
         pin_memory=True, 
-        drop_last=True
+        drop_last=(batch_sizes['valid_batch_size'] is not None)
     )
     
     loaders = {
-        'train_features_loader': train_features_loader, 
+        'train_loader': train_loader, 
         'valid_loader': valid_loader
     }
 
