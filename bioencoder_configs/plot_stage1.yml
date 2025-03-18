@@ -4,11 +4,15 @@ model:
   stage: first # Training stage: 'first' for initial training, 'second' for fine-tuning
 
 dataloaders:
-  train_batch_size:  # Larger is faster but may drop leftover data points - no value or removing this line will not include training data
-  valid_batch_size: 10 # Larger is faster but may drop leftover data points - ideally use a multiple of val set size
+  train_batch_size: 20 # Larger is faster; no value or removing this line will not include training data
+  valid_batch_size: 20 # Larger is faster; val data is always plotted
   num_workers: 32 # Should not exceed available CPU cores
 
-plot_style: 1 # (1: pictogram above point, 2: pictogram next to plot panel)
+img_size: 384 # image size used for training
+
+perplexity: 30 # for tSNE<; cannot be larger than dataset
+
+plot_style: 2 # (1: pictogram above point, 2: pictogram next to plot panel)
 point_size: 10  ## size of points in scatter plot
 color_map: 'Set1' # Default color map; see https://matplotlib.org/stable/users/explain/colors/colormaps.html for options
 #color_classes: # overrides color_map

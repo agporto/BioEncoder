@@ -13,8 +13,10 @@ def get_transforms(config, valid=False):
     Returns:
         albumentations.core.composition.Compose: The image transformation pipeline.
     """
-    default_size = 224
-    img_size = config.get('img_size', default_size)
+    
+    img_size = config.get('img_size')
+    if img_size is None:
+        raise ValueError("config must include 'img_size'")
     config_aug = config.get('augmentations', {})
     aug = get_aug_from_config(config_aug.get('transforms', []))
 
