@@ -242,7 +242,7 @@ def embbedings_dimension_reductions(data_table, perplexity):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None, plot_style=1, 
+def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, plot_style=1, 
                point_size=10, **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
@@ -265,7 +265,6 @@ def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None
    
     unique_classes = df['class'].unique()
  
-   
     ## Color management
     if color_classes:
         assert len(unique_classes) == len(color_classes), (
