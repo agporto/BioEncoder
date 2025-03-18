@@ -4,21 +4,15 @@ model:
   stage: first # Training stage: 'first' for initial training, 'second' for fine-tuning
 
 dataloaders:
-  train_batch_size: 2 # Batch size for training data; ensure validation set size is a multiple of this number
-  valid_batch_size: 2 # Batch size for validation data
-  num_workers: 32 # Number of CPU threads for data loading; should not exceed the number of CPU cores
-
-img_size: 384 # Image size for training and validation
+  train_batch_size:  # Larger is faster but may drop leftover data points - no value or removing this line will not include training data
+  valid_batch_size: 10 # Larger is faster but may drop leftover data points - ideally use a multiple of val set size
+  num_workers: 32 # Should not exceed available CPU cores
 
 plot_style: 1 # (1: pictogram above point, 2: pictogram next to plot panel)
-
-color_classes: # overrides color_map
+point_size: 10  ## size of points in scatter plot
+color_map: 'Set1' # Default color map; see https://matplotlib.org/stable/users/explain/colors/colormaps.html for options
+#color_classes: # overrides color_map
   #class1: "#FFD467"
   #class2: "#4DC9F2"
-
-point_size: 10  ## size of points in scatter plot
-
-color_map: 'Set1' # Default color map; see https://matplotlib.org/stable/users/explain/colors/colormaps.html for options
-
   
   

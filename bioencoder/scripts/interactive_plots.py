@@ -61,7 +61,7 @@ def interactive_plots(
         "valid_batch_size": hyperparams.get("dataloaders", {}).get("valid_batch_size",1),
     }
     num_workers = hyperparams.get("dataloaders", {}).get("num_workers", 4)
-    perplexity = hyperparams.get("perplexity", 30)
+    perplexity = hyperparams.get("perplexity")
 
     plot_config = {
         "color_classes": hyperparams.get("color_classes", None),
@@ -71,11 +71,13 @@ def interactive_plots(
     }
     
     
-    ## Set up directories
+    ## directories and file management
     data_dir = os.path.join(root_dir, "data", run_name)
-    plot_path = os.path.join(root_dir, "plots", run_name, f"embeddings_{run_name}.html")
+    plot_dir = os.path.join(root_dir, "plots", run_name)
+    os.makedirs(plot_dir, exist_ok=True)
+    plot_path = os.path.join(plot_dir, "embeddings_interactive_plot.html")
     if not overwrite and not kwargs.get("ret_embeddings"):
-        assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
+        assert not os.path.isfile(plot_path), f"File already exists: {plot_path}"
     
     ## Load model and set up
     print(f"Checkpoint: using {checkpoint} of {stage} stage")
