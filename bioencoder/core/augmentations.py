@@ -2,7 +2,7 @@ import copy
 import albumentations as A
 from albumentations import pytorch as AT
 
-def get_transforms(config, valid=False):
+def get_transforms(config, no_aug=False):
     """
     Return a transformation pipeline based on the provided configuration.
 
@@ -22,7 +22,7 @@ def get_transforms(config, valid=False):
 
     return A.Compose([
         A.Resize(img_size, img_size, always_apply=True),
-        A.NoOp() if valid else aug,
+        A.NoOp() if no_aug else aug,
         A.Normalize(),
         AT.ToTensorV2()
     ])
