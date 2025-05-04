@@ -73,7 +73,10 @@ def model_explorer(
     backbone = hyperparams["model"]["backbone"]
     num_classes = hyperparams["model"].get("num_classes", None)
     stage = hyperparams["model"]["stage"]
-
+    img_size = hyperparams.get("img_size", None)
+    if img_size is None:
+        raise ValueError("config must include 'img_size'")
+    
     ## get swa path
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, "swa")
     
@@ -94,7 +97,7 @@ def model_explorer(
     uploaded_file = st.sidebar.file_uploader("Upload an Image", type=["png", "jpg", "jpeg"])
 
     ## get image transformations
-    transform = utils.get_transforms(hyperparams, valid=False)
+    transform = utils.get_transforms(hyperparams, no_aug=True)
 
     # Load the model and add to cache
     model = load_model(
@@ -105,9 +108,13 @@ def model_explorer(
         )
 
     if uploaded_file is not None:
+        
         # Display the uploaded image
         image = Image.open(uploaded_file).convert('RGB')
         st.sidebar.image(image, caption="Input Image", use_column_width=True)
+        
+        # resize image
+        image_resized = image.resize((img_size, img_size))
 
         # Generate visualizations
         selected = option_menu(None, vis_funcs, icons=['list' for _ in range(len(vis_funcs))], menu_icon="cast", orientation="horizontal")
@@ -123,27 +130,31 @@ def model_explorer(
             layer = st.selectbox("Select a layer", layers.keys())
             module = layers[layer]
             max_acts = st.slider("Max activations", 5, 64, 25)
-            result = vis.visualize_activations(model, module, image, max_acts=max_acts)
+            result = vis.visualize_activations(model, module, image_resized, max_acts=max_acts)
             st.pyplot(result)
 
         elif selected == 'Saliency':
-            result = vis.saliency_map(model, image)
+            result = vis.saliency_map(model, image_resized)
             st.pyplot(result)
 
         elif selected == 'GradCAM':
             # add activation type (Relu, Silu, etc_)
-            layers =[name.split('.')[0] for name, module in model.encoder.named_modules() if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
+            layers =[name.split('.')[0] for name, module in model.encoder.named_modules() \
+                     if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
             layer_set = sorted(set(layers))
             layer = st.selectbox("Select a layer", list(layer_set), index=len(list(layer_set))-1)
-            result = vis.grad_cam(model, model.encoder,image,target_layer=[layer], target_category= None)
+            result = vis.grad_cam(model, model.encoder,image_resized,target_layer=[layer], target_category= None)
             st.pyplot(result)
 
         elif selected == 'ConstrativeCAM':
-            layers =[name.split('.')[0] for name, module in model.encoder.named_modules() if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
+            layers =[name.split('.')[0] for name, module in model.encoder.named_modules() \
+                     if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
             layer_set = sorted(set(layers))
             layer = st.selectbox("Select a layer", list(layer_set), index=len(list(layer_set))-1)
             target = st.selectbox("Select a target", class_names)
-            result = vis.contrast_cam(model, model.encoder,image,target_layer=[layer], target_category=class_names.index(target))
+            result = vis.contrast_cam(
+                model, model.encoder, image_resized,target_layer=[layer], 
+                target_category=class_names.index(target))
             st.pyplot(result)
 
 

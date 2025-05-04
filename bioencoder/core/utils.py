@@ -188,7 +188,7 @@ def build_transforms(config):
 
     """
     train_transforms = get_transforms(config)
-    valid_transforms = get_transforms(config, valid=True)
+    valid_transforms = get_transforms(config, no_aug=True)
 
     return {
         "train_transforms": train_transforms,

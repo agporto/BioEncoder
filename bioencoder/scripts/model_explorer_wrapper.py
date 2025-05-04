@@ -15,9 +15,6 @@ def model_explorer_wrapper(config_path):
     process = ["streamlit", "run", script_path , "--", "--config-path", config_path]
     subprocess.run(process)
     
-
-
-    
 def cli():
 
     parser = argparse.ArgumentParser()
