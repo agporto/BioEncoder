@@ -110,7 +110,8 @@ def saliency_map(model, img, device = 'cuda', save_path = None):
         plt.savefig(save_path)
     return fig
 
-def grad_cam(model, module, img, target_layer = ["4"], target_category= None, device = 'cuda', save_path = None):
+def grad_cam(model, module, img, target_layer = ["4"], 
+             target_category= None, device = 'cuda', save_path = None):
     
     for param in model.parameters():
         param.requires_grad = True

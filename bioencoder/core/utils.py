@@ -188,7 +188,7 @@ def build_transforms(config):
 
     """
     train_transforms = get_transforms(config)
-    valid_transforms = get_transforms(config, valid=True)
+    valid_transforms = get_transforms(config, no_aug=True)
 
     return {
         "train_transforms": train_transforms,
@@ -196,7 +196,9 @@ def build_transforms(config):
     }
 
 
-def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=False, is_supcon=False):
+def build_loaders(data_dir, transforms, batch_sizes, num_workers, 
+                  second_stage=False, is_supcon=False,
+                  shuffle_train=True, drop_last=True):
     """
     Build data loaders for training and validation.
     
@@ -230,19 +232,19 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=F
     train_loader = torch.utils.data.DataLoader(
         train_features_dataset, 
         batch_size=batch_sizes['train_batch_size'], 
-        shuffle=True,
+        shuffle=shuffle_train,
         num_workers=num_workers, 
         pin_memory=True, 
-        drop_last=(batch_sizes['train_batch_size'] is not None)
+        drop_last=drop_last and batch_sizes['train_batch_size'] is not None
     )
-        
+
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset, 
         batch_size=batch_sizes['valid_batch_size'], 
         shuffle=False,
         num_workers=num_workers, 
         pin_memory=True, 
-        drop_last=(batch_sizes['valid_batch_size'] is not None)
+        drop_last=drop_last
     )
     
     loaders = {

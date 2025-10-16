@@ -2,7 +2,7 @@ import copy
 import albumentations as A
 from albumentations import pytorch as AT
 
-def get_transforms(config, valid=False):
+def get_transforms(config, no_aug=False):
     """
     Return a transformation pipeline based on the provided configuration.
 
@@ -13,14 +13,16 @@ def get_transforms(config, valid=False):
     Returns:
         albumentations.core.composition.Compose: The image transformation pipeline.
     """
-    default_size = 224
-    img_size = config.get('img_size', default_size)
+    
+    img_size = config.get('img_size')
+    if img_size is None:
+        raise ValueError("config must include 'img_size'")
     config_aug = config.get('augmentations', {})
     aug = get_aug_from_config(config_aug.get('transforms', []))
 
     return A.Compose([
         A.Resize(img_size, img_size, always_apply=True),
-        A.NoOp() if valid else aug,
+        A.NoOp() if no_aug else aug,
         A.Normalize(),
         AT.ToTensorV2()
     ])

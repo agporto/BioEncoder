@@ -61,7 +61,7 @@ def interactive_plots(
         "valid_batch_size": hyperparams.get("dataloaders", {}).get("valid_batch_size",1),
     }
     num_workers = hyperparams.get("dataloaders", {}).get("num_workers", 4)
-    perplexity = hyperparams.get("perplexity", 30)
+    perplexity = hyperparams.get("perplexity")
 
     plot_config = {
         "color_classes": hyperparams.get("color_classes", None),
@@ -70,43 +70,40 @@ def interactive_plots(
         "point_size": hyperparams.get("point_size", 10),
     }
     
-    
-    ## Set up directories
+    ## directories and file management
     data_dir = os.path.join(root_dir, "data", run_name)
-    plot_path = os.path.join(root_dir, "plots", run_name, f"embeddings_{run_name}.html")
+    plot_dir = os.path.join(root_dir, "plots", run_name)
+    os.makedirs(plot_dir, exist_ok=True)
+    plot_path = os.path.join(plot_dir, "embeddings_interactive_plot.html")
     if not overwrite and not kwargs.get("ret_embeddings"):
-        assert not os.path.isfile(plot_path), f"File exists: {plot_path}"
+        assert not os.path.isfile(plot_path), f"File already exists: {plot_path}"
     
     ## Load model and set up
     print(f"Checkpoint: using {checkpoint} of {stage} stage")
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, checkpoint)
     utils.set_seed()
-    transforms = utils.build_transforms(hyperparams)
-    loaders = utils.build_loaders(data_dir, transforms, batch_sizes, num_workers, second_stage=(stage == "second"))
     model = utils.build_model(backbone, second_stage=(stage == "second"), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
     model.use_projection_head(False)
     model.eval()
     
-    ## Determine which embeddings to compute
+    ## prep computation
+    transforms = utils.build_transforms(hyperparams)
+    loaders = utils.build_loaders(
+        data_dir, transforms, batch_sizes, num_workers, 
+        second_stage=(stage == "second"), drop_last=False, shuffle_train=False)
     embeddings, labels, rel_paths = [], [], []
     
-    ## val batch size cant be zero
+    ## val set - batch size cant be zero
     embeddings_val, labels_val = utils.compute_embeddings(loaders["valid_loader"], model)
-    if len(embeddings_val) < len(loaders["valid_loader"].dataset.imgs):
-        missed_imgs = len(loaders["valid_loader"].dataset.imgs) - len(embeddings_val)
-        print(f"Warning: missed {missed_imgs} images because batch size was not a multiple of validation dataset size.")
-    rel_paths_val = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs[:len(embeddings_val)]]
+    rel_paths_val = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs]
     embeddings.extend(embeddings_val)
     labels.extend(labels_val)
     rel_paths.extend(rel_paths_val)
     
-    ## train set embeddings
+    ## train set - skipped if zero batch size
     if batch_sizes["train_batch_size"] is not None:
         embeddings_train, labels_train = utils.compute_embeddings(loaders["train_loader"], model)
-        if len(embeddings_train) < len(loaders["train_loader"].dataset.imgs):
-            missed_imgs = len(loaders["train_loader"].dataset.imgs) - len(embeddings_train)
-            print(f"Warning: missed {missed_imgs} images because batch size was not a multiple of training dataset size.")
-        rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["train_loader"].dataset.imgs[:len(embeddings_train)]]
+        rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["train_loader"].dataset.imgs]
         embeddings.extend(embeddings_train)
         labels.extend(labels_train)
         rel_paths.extend(rel_paths_train)
@@ -118,7 +115,7 @@ def interactive_plots(
         
     ## Reduce dimensionality
     if not perplexity:
-        perplexity = min(100, len(embeddings) // 2)
+        perplexity = min(30, max(5, (len(embeddings) - 1) / 3))
         print(f"tSNE: using a perplexity value of {perplexity}")
     reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(embeddings, perplexity)
     
@@ -127,7 +124,6 @@ def interactive_plots(
     df["paths"] = [os.path.join("..", "..", p) for p in rel_paths]
     df["class"], df["class_str"] = labels, [os.path.basename(os.path.dirname(p)) for p in rel_paths]
     df["dataset"] = df["paths"].apply(lambda x: "validation" if "/val/" in x else "train")
-        
     helpers.bokeh_plot(df, out_path=plot_path, **plot_config)
 
     

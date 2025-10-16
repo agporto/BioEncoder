@@ -242,7 +242,7 @@ def embbedings_dimension_reductions(data_table, perplexity):
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None, plot_style=1, 
+def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, plot_style=1, 
                point_size=10, **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
@@ -264,8 +264,9 @@ def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None
         raise ValueError("The dataframe must have columns 'paths' and 'class'")      
    
     unique_classes = df['class'].unique()
- 
-   
+    unique_datasets = df['dataset'].unique()
+    markers = ['circle', 'square']  # Define markers for each group
+
     ## Color management
     if color_classes:
         assert len(unique_classes) == len(color_classes), (
@@ -284,10 +285,12 @@ def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None
         colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
         df['color'] = colors_str
         
+        
     source = ColumnDataSource(df)
     bplot.output_file(out_path)
     
     if plot_style == 1:
+        div = Div(text="")
         tooltip = """
         <div>
             <div>
@@ -306,18 +309,12 @@ def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None
         hover1 = HoverTool(tooltips=tooltip)
         tools0 = [t() for t in TOOLS] + [hover0]
         tools1 = [t() for t in TOOLS] + [hover1]
-        pca = bplot.figure(tools=tools0)
-        pca.scatter('PC1', 'PC2', color='color', source=source, size=point_size)
-        tsne = bplot.figure(tools=tools1)
-        tsne.scatter('tSNE-0', 'tSNE-1', color='color', source=source, size=point_size)
-        p = bplot.gridplot([[pca, tsne]])
-        bplot.show(p)
-        
+
     elif plot_style == 2:
         div = Div(text="")
         hover=HoverTool(
                 tooltips = [
-                ("class_str", "@class_str"),
+                ("Class", "@class_str"),
                 ]
         )
         hover.callback = CustomJS(args=dict(div=div, ds=source), code="""
@@ -333,11 +330,28 @@ def bokeh_plot(df, out_path='plot.html', color_map="viridis", color_classes=None
             """)
         tools0 = [t() for t in TOOLS] + [hover]
         tools1 = [t() for t in TOOLS] + [hover]
-        pca = bplot.figure(tools=tools0)
-        pca.scatter('PC1', 'PC2', color='color', source=source, size=point_size)
-        tsne = bplot.figure(tools=tools1)
-        tsne.scatter('tSNE-0', 'tSNE-1', color='color', source=source, size=point_size)
-        p = bplot.gridplot([[pca, tsne]])
-        show(layouts.row(p, div))
+        
+    # Create figures
+    pca = bplot.figure(tools=tools0, title="PCA", match_aspect=True)
+    tsne = bplot.figure(tools=tools1, title="t-SNE", match_aspect=True)
+    
+    # Store renderers for dataset legend
+    legend_items_dataset = []
+    
+    # Scatter plots with different markers for datasets
+    for dataset, marker in zip(unique_datasets, markers):
+        dataset_source = ColumnDataSource(df[df['dataset'].astype(str) == dataset])  # Filter dataset-specific data
+        r = pca.scatter('PC1', 'PC2', source=dataset_source, color='color', size=point_size, marker=marker)
+        tsne.scatter('tSNE-0', 'tSNE-1', source=dataset_source, color='color', size=point_size, marker=marker)
+        legend_items_dataset.append(LegendItem(label=str(dataset), renderers=[r]))
+    
+    # Create and add horizontal legend for dataset markers
+    legend_dataset = Legend(items=legend_items_dataset, orientation="horizontal")
+    pca.add_layout(legend_dataset, 'below')
+    
+    # Display plots
+    p = bplot.gridplot([[pca, tsne]])
+    show(layouts.row(p, div))
+
 
     return p

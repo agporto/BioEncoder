@@ -85,7 +85,7 @@ def inference(
     utils.set_seed()
 
     ## get transformations
-    transform = utils.get_transforms(hyperparams, valid=False)
+    transform = utils.get_transforms(hyperparams, no_aug=True)
 
     ## build model
     if config.model_path != ckpt_pretrained:
