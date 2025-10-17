@@ -11,6 +11,7 @@ from tqdm import tqdm
 from functools import wraps
 
 import torch
+from torch.utils.data.distributed import DistributedSampler
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
@@ -198,7 +199,8 @@ def build_transforms(config):
 
 def build_loaders(data_dir, transforms, batch_sizes, num_workers, 
                   second_stage=False, is_supcon=False,
-                  shuffle_train=True, drop_last=True):
+                  shuffle_train=True, drop_last=True,
+                  distributed=False):
     """
     Build data loaders for training and validation.
     
@@ -229,10 +231,16 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         second_stage=True
     )
 
+    # Training sampler for distributed training
+    train_sampler = None
+    if distributed:
+        train_sampler = DistributedSampler(train_features_dataset, shuffle=shuffle_train, drop_last=drop_last)
+
     train_loader = torch.utils.data.DataLoader(
         train_features_dataset, 
         batch_size=batch_sizes['train_batch_size'], 
-        shuffle=shuffle_train,
+        shuffle=(shuffle_train and not distributed),
+        sampler=train_sampler,
         num_workers=num_workers, 
         pin_memory=True, 
         drop_last=drop_last and batch_sizes['train_batch_size'] is not None
@@ -247,9 +255,20 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         drop_last=drop_last
     )
     
+    # Build an evaluation loader over the full training dataset (no sampler) for validation on rank 0
+    train_eval_loader = torch.utils.data.DataLoader(
+        train_features_dataset,
+        batch_size=batch_sizes.get('valid_batch_size') or batch_sizes['train_batch_size'],
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=False,
+    )
+
     loaders = {
         'train_loader': train_loader, 
-        'valid_loader': valid_loader
+        'valid_loader': valid_loader,
+        'train_eval_loader': train_eval_loader,
     }
 
     if not second_stage:
@@ -260,15 +279,26 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
             second_stage=False if is_supcon else True
         )
 
+        train_supcon_sampler = None
+        if distributed:
+            train_supcon_sampler = DistributedSampler(train_supcon_dataset, shuffle=True)
+
         train_supcon_loader = torch.utils.data.DataLoader(
             train_supcon_dataset, 
             batch_size=batch_sizes['train_batch_size'], 
-            shuffle=True,
+            shuffle=(not distributed),
+            sampler=train_supcon_sampler,
             num_workers=num_workers, 
             pin_memory=True
         )
 
         loaders['train_supcon_loader'] = train_supcon_loader
+        if distributed:
+            loaders['train_supcon_sampler'] = train_supcon_sampler
+
+    # Expose samplers for epoch-wise shuffling
+    if distributed:
+        loaders['train_sampler'] = train_sampler
 
     return loaders
     

@@ -14,6 +14,8 @@ from rich.pretty import pretty_repr
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_ema import ExponentialMovingAverage
 
 from bioencoder import config, utils
@@ -93,11 +95,17 @@ def train(
     log_dir = os.path.join(root_dir, "logs", run_name, stage)
     run_dir = os.path.join(root_dir, "runs", run_name, stage)
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
-    for directory in [log_dir, run_dir, weights_dir]:
-        if os.path.exists(directory) and overwrite==True:
-            print(f"removing {directory} (overwrite=True)")
-            shutil.rmtree(directory)
-        os.makedirs(directory)
+    # Create output directories (rank 0 only to avoid races)
+    if os.path.exists(log_dir) and overwrite and os.path.isdir(log_dir):
+        pass
+    if is_main_process:
+        for directory in [log_dir, run_dir, weights_dir]:
+            if os.path.exists(directory) and overwrite==True:
+                print(f"removing {directory} (overwrite=True)")
+                shutil.rmtree(directory)
+            os.makedirs(directory, exist_ok=True)
+    if dist.is_available() and dist.is_initialized():
+        dist.barrier()
         
     ## collect information on data
     train_dir, val_dir = os.path.join(data_dir, "train"), os.path.join(data_dir, "val")
@@ -107,29 +115,63 @@ def train(
         data_stats["train"][class_name] = len(os.listdir(os.path.join(train_dir, class_name)))
         data_stats["val"][class_name] = len(os.listdir(os.path.join(val_dir, class_name)))
 
-    ## set up logging and tensorboard writer
-    writer = SummaryWriter(run_dir)
+    # --- distributed init ---
+    def init_distributed():
+        distributed = False
+        rank = 0
+        world_size = 1
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        if os.environ.get("WORLD_SIZE") is not None and int(os.environ["WORLD_SIZE"]) > 1:
+            distributed = True
+            rank = int(os.environ.get("RANK", 0))
+            world_size = int(os.environ["WORLD_SIZE"])
+        if distributed:
+            backend = "nccl"
+            # Fallback for platforms without NCCL (e.g., Windows)
+            try:
+                torch.cuda.set_device(local_rank)
+                dist.init_process_group(backend=backend, init_method="env://", world_size=world_size, rank=rank)
+            except Exception:
+                backend = "gloo"
+                torch.cuda.set_device(local_rank)
+                dist.init_process_group(backend=backend, init_method="env://", world_size=world_size, rank=rank)
+        else:
+            # single GPU or CPU fallback
+            if torch.cuda.is_available():
+                torch.cuda.set_device(local_rank)
+        return distributed, rank, world_size, local_rank
+
+    distributed, rank, world_size, local_rank = init_distributed()
+
+    is_main_process = (rank == 0)
+
+    ## set up logging and tensorboard writer (rank 0 only)
+    writer = SummaryWriter(run_dir) if is_main_process else None
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     if (logger.hasHandlers()):
         logger.handlers.clear()
     log_file_path = os.path.join(log_dir, f"{run_name}_{stage}.log")
-    
-    ## logging: stdout handler
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setLevel(logging.DEBUG)
-    stdout_formatter = logging.Formatter('%(asctime)s: %(message)s', "%H:%M:%S")
-    stdout_handler.setFormatter(stdout_formatter)
-    logger.addHandler(stdout_handler)
 
-    ## logging: logfile handler
-    if os.path.isfile(log_file_path):
-        os.remove(log_file_path)
-    file_handler = logging.FileHandler(log_file_path)
-    file_handler.setLevel(logging.INFO)
-    file_formatter = logging.Formatter('%(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
+    if is_main_process:
+        ## logging: stdout handler
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel(logging.DEBUG)
+        stdout_formatter = logging.Formatter('%(asctime)s: %(message)s', "%H:%M:%S")
+        stdout_handler.setFormatter(stdout_formatter)
+        logger.addHandler(stdout_handler)
+
+        ## logging: logfile handler
+        if os.path.isfile(log_file_path):
+            os.remove(log_file_path)
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(logging.INFO)
+        file_formatter = logging.Formatter('%(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+    else:
+        # Avoid warnings for no handlers on non-main ranks
+        logger.addHandler(logging.NullHandler())
     
     ## manage second stage
     if stage == "second":
@@ -180,34 +222,38 @@ def train(
         num_workers, 
         second_stage=(stage == "second"), 
         is_supcon=(criterion_params["name"] == "SupCon"),
+        distributed=distributed,
     )
     model = utils.build_model(
         backbone,
         second_stage=(stage == "second"),
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
-    ).cuda()
+        cuda_device=local_rank,
+    ).cuda(local_rank)
+
+    if distributed:
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
     
     ## save a sample of augmented images
-    if aug_sample:
+    if aug_sample and is_main_process:
         utils.save_augmented_sample(data_dir, transforms["train_transforms"], aug_sample_n, seed=aug_sample_seed)
         logger.info(f"Saving augmentation samples: {aug_sample_n} per class to data/{run_name}/aug_sample")
 
     logger.info(f"Using backbone: {backbone}")
     
     ## configure GPU 
-    assert torch.cuda.device_count() > 0, "No GPUs detected on this System (check your CUDA setup) - aborting."
-    if torch.cuda.device_count() == 1:
-        logger.info(f"Found one GPU: {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
-    else:
-        logger.info(f"Found {torch.cuda.device_count()} GPUs, but unfortunately multi-GPU use isn't implemented yet.")
-        logger.info(f"Using GPU {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+    if is_main_process:
+        assert torch.cuda.device_count() > 0, "No GPUs detected on this System (check your CUDA setup) - aborting."
+        if distributed:
+            logger.info(f"Distributed training enabled: world_size={world_size}, backend={dist.get_backend() if dist.is_initialized() else 'N/A'}")
+            logger.info(f"Running on device {local_rank}: {torch.cuda.get_device_name(local_rank)}")
+        else:
+            if torch.cuda.device_count() == 1:
+                logger.info(f"Found one GPU: {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+            else:
+                logger.info(f"Found {torch.cuda.device_count()} GPUs; using single-process training on GPU {torch.cuda.current_device()}")
         
-        # ## set cuda device
-        # torch.cuda.set_device(cuda_device)
-        # print(f"Using CUDA device {cuda_device}")
-        # model = torch.nn.DataParallel(model)   
-
     ## configure optimizer
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
@@ -218,10 +264,13 @@ def train(
         optim["scheduler"],
         optim["loss_optimizer"],
     )
-    if ema:
+    if ema and is_main_process:
         iters = len(loaders["train_loader"])
         ema_decay = ema_decay_per_epoch ** (1 / iters)
-        ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
+        # EMA only on main process
+        ema = ExponentialMovingAverage((model.module if isinstance(model, DDP) else model).parameters(), decay=ema_decay)
+    else:
+        ema = None
 
     if loss_optimizer is not None and stage == 'second':
         raise ValueError('Loss optimizers should only be present for stage 1 training. Check your config file.') 
@@ -231,6 +280,11 @@ def train(
     if not dry_run:
         for epoch in range(n_epochs):
             logger.info(utils.pprint_fill_hbar(f"START - Epoch {epoch}"))
+            # Distributed sampler epoch shuffling
+            if distributed and 'train_sampler' in loaders:
+                loaders['train_sampler'].set_epoch(epoch)
+            if distributed and 'train_supcon_sampler' in loaders:
+                loaders['train_supcon_sampler'].set_epoch(epoch)
             start_training_time = time.time()
             if stage == "first":
                 train_metrics = utils.train_epoch_constructive(
@@ -253,99 +307,106 @@ def train(
                 )
             end_training_time = time.time()
     
-            if ema:
-                copy_of_model_parameters = utils.copy_parameters_from_model(model)
-                ema.copy_to(model.parameters())
+            if ema and is_main_process:
+                m_ref = model.module if isinstance(model, DDP) else model
+                copy_of_model_parameters = utils.copy_parameters_from_model(m_ref)
+                ema.copy_to(m_ref.parameters())
     
             start_validation_time = time.time()
+            if distributed and dist.is_initialized():
+                dist.barrier()
     
-            if stage == "first":
-                valid_metrics_projection_head = utils.validation_constructive(
-                    loaders["valid_loader"], loaders["train_loader"], model, scaler
-                )
-                
-                ## check for GPU parallelization
-                #model_copy = model.module if isinstance(model, torch.nn.DataParallel) else model
-                
-                #model_copy.use_projection_head(False)
-                model.use_projection_head(False)
-                valid_metrics_encoder = utils.validation_constructive(
-                    loaders["valid_loader"], loaders["train_loader"], model, scaler
-                )
-                model.use_projection_head(True)
-                #model_copy.use_projection_head(True)    parser.add_argument("--dry_run", action='store_true', help="Run without making any changes.")
+            if is_main_process:
+                if stage == "first":
+                    # use non-sampled train_eval_loader for reference embeddings
+                    valid_metrics_projection_head = utils.validation_constructive(
+                        loaders["valid_loader"], loaders.get("train_eval_loader", loaders["train_loader"]), model, scaler
+                    )
+                    model_ref = model.module if isinstance(model, DDP) else model
+                    model_ref.use_projection_head(False)
+                    valid_metrics_encoder = utils.validation_constructive(
+                        loaders["valid_loader"], loaders.get("train_eval_loader", loaders["train_loader"]), model, scaler
+                    )
+                    model_ref.use_projection_head(True)
 
-                
-                ## epoch summary
-                message = "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
-                    epoch,
-                    end_training_time - start_training_time,
-                    time.time() - start_validation_time,
-                    train_metrics["loss"],
-                    pretty_repr(valid_metrics_projection_head),
-                    pretty_repr(valid_metrics_encoder),
-                )
-                logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
-                valid_metrics = valid_metrics_projection_head
-            else:
-                valid_metrics = utils.validation_ce(
-                    model, criterion, loaders["valid_loader"], scaler
-                )
-                ## epoch summary
-                message =  "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
+                    ## epoch summary
+                    message = "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc projection head {}\nvalid acc encoder {}".format(
                         epoch,
                         end_training_time - start_training_time,
                         time.time() - start_validation_time,
                         train_metrics["loss"],
-                        pretty_repr(valid_metrics),
-                )
-                logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
+                        pretty_repr(valid_metrics_projection_head),
+                        pretty_repr(valid_metrics_encoder),
+                    )
+                    logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
+                    valid_metrics = valid_metrics_projection_head
+                else:
+                    valid_metrics = utils.validation_ce(
+                        model, criterion, loaders["valid_loader"], scaler
+                    )
+                    ## epoch summary
+                    message =  "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
+                            epoch,
+                            end_training_time - start_training_time,
+                            time.time() - start_validation_time,
+                            train_metrics["loss"],
+                            pretty_repr(valid_metrics),
+                    )
+                    logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
     
             # write train and valid metrics to the logs
-            utils.add_to_tensorboard_logs(
-                writer, train_metrics["loss"], "Loss/train", epoch
-            )
-            for valid_metric in valid_metrics:
-                try:
-                    utils.add_to_tensorboard_logs(
-                        writer,
-                        valid_metrics[valid_metric],
-                        "{}/validation".format(valid_metric),
-                        epoch,
-                    )
-                except AssertionError:
-                    # in case valid metric is a listhyperparams
-                    pass
+            if is_main_process and writer is not None:
+                utils.add_to_tensorboard_logs(
+                    writer, train_metrics["loss"], "Loss/train", epoch
+                )
+                if 'valid_metrics' in locals():
+                    for valid_metric in valid_metrics:
+                        try:
+                            utils.add_to_tensorboard_logs(
+                                writer,
+                                valid_metrics[valid_metric],
+                                "{}/validation".format(valid_metric),
+                                epoch,
+                            )
+                        except AssertionError:
+                            pass
     
             # check if the best value of metric changed. If so -> save the model
-            if (
-                valid_metrics[target_metric] > metric_best*0.99
-            ):  # > 0 if wanting to save all models 
-                logger.info(
-                    "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(
-                        target_metric, metric_best, valid_metrics[target_metric]
+            if is_main_process:
+                if (
+                    valid_metrics[target_metric] > metric_best*0.99
+                ):  # > 0 if wanting to save all models 
+                    logger.info(
+                        "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(
+                            target_metric, metric_best, valid_metrics[target_metric]
+                        )
                     )
-                )
-    
-                torch.save(
-                    {
-                        "epoch": epoch,
-                        "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                    },
-                    os.path.join(weights_dir, f"epoch{epoch}"),
-                )
-                metric_best = valid_metrics[target_metric]
+
+                    torch.save(
+                        {
+                            "epoch": epoch,
+                            "model_state_dict": (model.module.state_dict() if isinstance(model, DDP) else model.state_dict()),
+                            "optimizer_state_dict": optimizer.state_dict(),
+                        },
+                        os.path.join(weights_dir, f"epoch{epoch}"),
+                    )
+                    metric_best = valid_metrics[target_metric]
     
             # if ema is used, go back to regular weights without ema
-            if ema:
-                utils.copy_parameters_to_model(copy_of_model_parameters, model)
+            if ema and is_main_process:
+                m_ref = model.module if isinstance(model, DDP) else model
+                utils.copy_parameters_to_model(copy_of_model_parameters, m_ref)
     
             scheduler.step()
             logger.info(utils.pprint_fill_hbar(f"END - Epoch {epoch}"))
     else:
-        logger.info(utils.pprint_fill_hbar("DRY-RUN ONLY - NO TRAINING"))
-    writer.close()
+        if is_main_process:
+            logger.info(utils.pprint_fill_hbar("DRY-RUN ONLY - NO TRAINING"))
+    if writer is not None:
+        writer.close()
+    if dist.is_available() and dist.is_initialized():
+        dist.barrier()
+        dist.destroy_process_group()
     logging.shutdown()
 
 
