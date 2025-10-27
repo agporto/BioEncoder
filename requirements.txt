@@ -6,6 +6,7 @@ matplotlib
 numpy
 pandas
 pytorch-metric-learning==2.0.1
+rich
 scikit-learn
 streamlit-option-menu
 tensorboard
