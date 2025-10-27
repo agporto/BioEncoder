@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+- FIX: previous fixes didn't get fully merged from dev branch
+- FIX: install rich
+
 ## 1.0.1
 - NEW: perplexity option for interactive plots
 - FIX: horizontal bar plotting in headless environments and inference without config
