@@ -69,19 +69,21 @@ def interactive_plots(
         "plot_style": hyperparams.get("plot_style", 1),
         "point_size": hyperparams.get("point_size", 10),
     }
-    
+
+    return_results = hyperparams.get("return_results", False)
+
     ## directories and file management
     data_dir = os.path.join(root_dir, "data", run_name)
     plot_dir = os.path.join(root_dir, "plots", run_name)
     os.makedirs(plot_dir, exist_ok=True)
     plot_path = os.path.join(plot_dir, "embeddings_interactive_plot.html")
-    if not overwrite and not kwargs.get("ret_embeddings"):
+    if not overwrite and not (return_embeddings or return_coords):
         assert not os.path.isfile(plot_path), f"File already exists: {plot_path}"
     
     ## Load model and set up
     print(f"Checkpoint: using {checkpoint} of {stage} stage")
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, checkpoint)
-    utils.set_seed()
+    seed = utils.set_seed()
     model = utils.build_model(backbone, second_stage=(stage == "second"), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
     model.use_projection_head(False)
     model.eval()
@@ -91,40 +93,57 @@ def interactive_plots(
     loaders = utils.build_loaders(
         data_dir, transforms, batch_sizes, num_workers, 
         second_stage=(stage == "second"), drop_last=False, shuffle_train=False)
-    embeddings, labels, rel_paths = [], [], []
     
-    ## val set - batch size cant be zero
+    ## val set (always computed)
     embeddings_val, labels_val = utils.compute_embeddings(loaders["valid_loader"], model)
     rel_paths_val = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs]
-    embeddings.extend(embeddings_val)
-    labels.extend(labels_val)
-    rel_paths.extend(rel_paths_val)
+    # Build validation DataFrame (meta + embeddings)
+    df_val_meta = pd.DataFrame({
+        "image_name": [os.path.basename(p) for p in rel_paths_val],
+        "class_str": [os.path.basename(os.path.dirname(p)) for p in rel_paths_val],
+        "dataset": "val",
+    })
+    df_embeddings = pd.concat([df_val_meta, pd.DataFrame(embeddings_val)], axis=1)
     
     ## train set - skipped if zero batch size
     if batch_sizes["train_batch_size"] is not None:
         embeddings_train, labels_train = utils.compute_embeddings(loaders["train_loader"], model)
         rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["train_loader"].dataset.imgs]
-        embeddings.extend(embeddings_train)
-        labels.extend(labels_train)
-        rel_paths.extend(rel_paths_train)
-    
-    ## Return embeddings without plotting
-    if kwargs.get("ret_embeddings"):
-        df = pd.DataFrame({"image_name": [os.path.basename(p) for p in rel_paths], "class": [os.path.basename(os.path.dirname(p)) for p in rel_paths]})
-        return pd.concat([df, pd.DataFrame(embeddings)], axis=1)
         
+        # Build training DataFrame (meta + embeddings)
+        df_train_meta = pd.DataFrame({
+            "image_name": [os.path.basename(p) for p in rel_paths_train],
+            "class_str": [os.path.basename(os.path.dirname(p)) for p in rel_paths_train],
+            "dataset": "train",
+        })
+        df_train = pd.concat([df_train_meta, pd.DataFrame(embeddings_train)], axis=1)
+        df_embeddings = pd.concat([df_embeddings, df_train], ignore_index=True)
+
+    ## Stable order before reduction
+    df_embeddings = df_embeddings.sort_values(by=["class_str", "dataset","image_name"]).reset_index(drop=True)
+
     ## Reduce dimensionality
     if not perplexity:
-        perplexity = min(30, max(5, (len(embeddings) - 1) / 3))
-        print(f"tSNE: using a perplexity value of {perplexity}")
-    reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(embeddings, perplexity)
+        perplexity = min(30, max(5, (len(df_embeddings) - 1) / 3))
+    print(f"tSNE: using perplexity {perplexity}")
+    # Reduce on numeric embedding columns only
+    embedding_matrix = df_embeddings.select_dtypes(include=[np.number])
+    reduced_data, colnames, _ = helpers.embbedings_dimension_reductions(embedding_matrix, perplexity, seed)
     
     ## make plot
-    df = pd.DataFrame(reduced_data, columns=colnames)
-    df["paths"] = [os.path.join("..", "..", p) for p in rel_paths]
-    df["class"], df["class_str"] = labels, [os.path.basename(os.path.dirname(p)) for p in rel_paths]
-    df["dataset"] = df["paths"].apply(lambda x: "validation" if "/val/" in x else "train")
-    helpers.bokeh_plot(df, out_path=plot_path, **plot_config)
+    df_plot = df_embeddings.select_dtypes(exclude=[np.number])
+    df_plot['paths'] = df_plot.apply(lambda row: os.path.join(
+        "..", "..", "data", run_name, row['dataset'], row['class_str'], row['image_name']), axis=1)
+    df_plot["class"] = pd.Categorical(df_plot["class_str"]).codes
+    df_plot = pd.concat([df_plot, pd.DataFrame(reduced_data, columns=colnames)], axis=1)
+
+    helpers.bokeh_plot(df_plot, out_path=plot_path, **plot_config)
+
+    # Return logic: either one or both
+    if return_results:
+        return df_embeddings, df_plot
+
+
 
     
 def cli():

@@ -220,7 +220,7 @@ def feature_map_normalization(f):
     act_map /= act_map.max()
     return act_map
 
-def embbedings_dimension_reductions(data_table, perplexity):
+def embbedings_dimension_reductions(data_table, perplexity, seed):
     """
     Perform dimension reduction on the input data.
 
@@ -235,14 +235,25 @@ def embbedings_dimension_reductions(data_table, perplexity):
     mean = np.mean(data_table, axis=0)
     std = np.std(data_table, axis=0)
     norm_data = (data_table - mean) / std
+    
+    ## PCA 
     pca_obj = decomposition.PCA(n_components=2)
     pca = pca_obj.fit_transform(norm_data)
-    tsne = manifold.TSNE(perplexity=perplexity, learning_rate='auto', init='pca').fit_transform(norm_data)
+
+    ## tSNE
+    tsne = manifold.TSNE(
+        perplexity=perplexity,
+        random_state=seed,
+        learning_rate='auto',
+        method="exact",
+        init=pca
+    ).fit_transform(norm_data)
+    
     names = ['PC1', 'PC2', 'tSNE-0', 'tSNE-1']
     return np.hstack((pca, tsne)), names, pca_obj
 
 
-def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, plot_style=1, 
+def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, plot_style=1, 
                point_size=10, **kwargs):
     """
     Plot a scatter plot of the PCA and t-SNE dimensions of the data using bokeh.
@@ -264,7 +275,7 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, p
         raise ValueError("The dataframe must have columns 'paths' and 'class'")      
    
     unique_classes = df['class'].unique()
-    unique_datasets = df['dataset'].unique()
+    unique_datasets = df['dataset'].astype(str).unique()
     markers = ['circle', 'square']  # Define markers for each group
 
     ## Color management
@@ -273,10 +284,9 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, p
             f"Number of classes is {len(unique_classes)}, but only {len(color_classes)} colors provided."
         )
 
-        # Convert dict to DataFrame and merge colors
-        df_col = pd.DataFrame.from_dict(color_classes.items())
-        df_col.columns = ["class_str", "color"]
-        df = df.merge(df_col, how="left", left_on="class", right_on="class_str").drop(columns=["class_str"])
+        # Convert dict to DataFrame and merge colors by class_str (deterministic, no row reordering)
+        df_col = pd.DataFrame(list(color_classes.items()), columns=["class_str", "color"])
+        df = df.merge(df_col, how="left", on="class_str")
 
     else:
         num_classes = len(unique_classes)
@@ -284,7 +294,6 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, p
         colors_raw = cmap(df['class'], bytes=True)
         colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
         df['color'] = colors_str
-        
         
     source = ColumnDataSource(df)
     bplot.output_file(out_path)
@@ -335,19 +344,22 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet1", color_classes=None, p
     pca = bplot.figure(tools=tools0, title="PCA", match_aspect=True)
     tsne = bplot.figure(tools=tools1, title="t-SNE", match_aspect=True)
     
-    # Store renderers for dataset legend
-    legend_items_dataset = []
-    
-    # Scatter plots with different markers for datasets
-    for dataset, marker in zip(unique_datasets, markers):
-        dataset_source = ColumnDataSource(df[df['dataset'].astype(str) == dataset])  # Filter dataset-specific data
-        r = pca.scatter('PC1', 'PC2', source=dataset_source, color='color', size=point_size, marker=marker)
-        tsne.scatter('tSNE-0', 'tSNE-1', source=dataset_source, color='color', size=point_size, marker=marker)
-        legend_items_dataset.append(LegendItem(label=str(dataset), renderers=[r]))
-    
-    # Create and add horizontal legend for dataset markers
-    legend_dataset = Legend(items=legend_items_dataset, orientation="horizontal")
-    pca.add_layout(legend_dataset, 'below')
+    # Single source scatter with per-point markers mapped from dataset; no reordering
+    from itertools import cycle, islice
+    dataset_factors = list(pd.unique(df['dataset'].astype(str)))
+    marker_factors = list(islice(cycle(markers), len(dataset_factors)))
+    marker_map = factor_mark('dataset', marker_factors, dataset_factors)
+
+    pca.scatter('PC1', 'PC2', source=source, color='color', size=point_size, marker=marker_map, legend_field='dataset')
+    tsne.scatter('tSNE-0', 'tSNE-1', source=source, color='color', size=point_size, marker=marker_map)
+
+    # Single legend below the PCA plot
+    if getattr(pca, 'legend', None) and len(pca.legend) > 0:
+        pca.legend[0].orientation = "horizontal"
+        pca.legend[0].location = "left"
+        pca.add_layout(pca.legend[0], 'below')
+    if getattr(tsne, 'legend', None):
+        tsne.legend.visible = False
     
     # Display plots
     p = bplot.gridplot([[pca, tsne]])

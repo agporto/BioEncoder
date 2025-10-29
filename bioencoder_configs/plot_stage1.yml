@@ -18,5 +18,7 @@ color_map: 'Set1' # Default color map; see https://matplotlib.org/stable/users/e
 #color_classes: # overrides color_map
   #class1: "#FFD467"
   #class2: "#4DC9F2"
-  
+
+return_results: False
+
   
