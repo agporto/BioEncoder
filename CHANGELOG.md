@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+- FIX: still incongruent plotting of combined train 
+- FIX: plot an augmentation sample with alpha channel imgs
+
 ## 1.0.2
 - FIX: previous fixes didn't get fully merged from dev branch
 - FIX: install rich
