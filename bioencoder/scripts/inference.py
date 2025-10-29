@@ -109,7 +109,8 @@ def inference(
     if isinstance(image, str):
         if not os.path.isfile(image):
             raise FileNotFoundError(f"File does not exist: {image}")
-        image = np.asarray(Image.open(image))
+        image = Image.open(image).convert("RGB")
+        image = np.asarray(image)
     elif not isinstance(image, (np.ndarray, np.generic)):
         raise TypeError("Input must be either an image path (str) or a NumPy array.")
     
