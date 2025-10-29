@@ -139,7 +139,7 @@ def interactive_plots(
 
     helpers.bokeh_plot(df_plot, out_path=plot_path, **plot_config)
 
-    # Return logic: either one or both
+    # return embeddings and plot coords
     if return_results:
         return df_embeddings, df_plot
 

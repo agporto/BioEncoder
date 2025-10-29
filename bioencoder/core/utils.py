@@ -681,7 +681,7 @@ def save_augmented_sample(data_dir, transform, n_samples, seed):
         ## apply augmentations and save
         for i, idx in enumerate(selected_indices):
             path, _ = dataset.samples[idx]
-            image = Image.open(path)
+            image = Image.open(path).convert("RGB")
             image_name = os.path.basename(path)
             augmented_image = transform(image=np.asarray(image))["image"]   
             to_pil_image = transforms.ToPILImage()
