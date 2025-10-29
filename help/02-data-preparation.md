@@ -1,6 +1,22 @@
 # BioEncoder root dir
 
-BioEncoder uses a single working directory to store all output related to a project. The different functions and steps will create different sub-folders inside - i.e., `split_dataset` will create the _data_ folder, `train` will create _logs_, _runs_ and _weights_ folders, and `interactive_plots` will create _plots_. In the end your working directory will look like this:
+To train a BioEncoder model, your image dataset should be arranged like this:
+
+```
+my-dataset/
+    class_1/
+        image_1.jpg
+        image_2.jpg
+        ...
+    class_2/
+        image_1.jpg
+        image_2.jpg
+        ...
+    ...
+```
+
+
+BioEncoder will copy them to a new working directory, where all output related to a specific project is stored. The different functions and steps will create different sub-folders inside - i.e., `split_dataset` will create the _data_ folder, `train` will create _logs_, _runs_ and _weights_ folders, and `interactive_plots` will create _plots_. In the end your working directory will look like this:
 
 ```
 bioencoder_wd/
