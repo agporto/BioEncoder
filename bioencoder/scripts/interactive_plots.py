@@ -77,7 +77,7 @@ def interactive_plots(
     plot_dir = os.path.join(root_dir, "plots", run_name)
     os.makedirs(plot_dir, exist_ok=True)
     plot_path = os.path.join(plot_dir, "embeddings_interactive_plot.html")
-    if not overwrite and not (return_embeddings or return_coords):
+    if not overwrite and not return_results:
         assert not os.path.isfile(plot_path), f"File already exists: {plot_path}"
     
     ## Load model and set up

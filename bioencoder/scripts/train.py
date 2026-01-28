@@ -84,9 +84,11 @@ def train(
         "valid_batch_size": hyperparams["dataloaders"]["valid_batch_size"],
     }
     num_workers = hyperparams["dataloaders"]["num_workers"]
-    aug_sample = hyperparams["augmentations"].get("sample_save", False)
-    aug_sample_n = hyperparams["augmentations"].get("sample_n", 5)
-    aug_sample_seed = hyperparams["augmentations"].get("sample_seed", 42)
+    aug_config = hyperparams.get("augmentations", {})
+    aug_sample = aug_config.get("sample_save", False)
+    aug_sample_n = aug_config.get("sample_n", 5)
+    aug_sample_seed = aug_config.get("sample_seed", 42)
+
 
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)

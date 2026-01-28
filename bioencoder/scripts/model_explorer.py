@@ -9,6 +9,7 @@ from PIL import Image
 import torch
 import streamlit as st
 from streamlit_option_menu import option_menu
+from torchvision.datasets import ImageFolder
 
 from bioencoder import config, utils, vis
 
@@ -63,9 +64,7 @@ def model_explorer(
     ## load bioencoer config
     root_dir = config.root_dir
     run_name = config.run_name
-    
-    class_names = os.listdir(os.path.join(root_dir, "data", run_name, "train"))
-
+        
     ## load config
     hyperparams = utils.load_yaml(config_path)
     
@@ -79,7 +78,6 @@ def model_explorer(
     
     ## get swa path
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, "swa")
-    
     if stage == 'first': 
         vis_funcs = ['Filters', 'Activations', 'Saliency']
     else:
@@ -90,14 +88,11 @@ def model_explorer(
 
     # Sidebar    
     img_path = "https://github.com/agporto/BioEncoder/raw/main/assets/bioencoder_logo.png"
-    st.sidebar.image(img_path, use_column_width=True)
+    st.sidebar.image(img_path, width='stretch')
     st.sidebar.title("BioEncoder Model Explorer")
 
     # Image upload
     uploaded_file = st.sidebar.file_uploader("Upload an Image", type=["png", "jpg", "jpeg"])
-
-    ## get image transformations
-    transform = utils.get_transforms(hyperparams, no_aug=True)
 
     # Load the model and add to cache
     model = load_model(
@@ -106,12 +101,17 @@ def model_explorer(
         num_classes, 
         stage
         )
-
+    
+    ## get class names
+    train_folder = os.path.join(root_dir, "data", run_name, "train")
+    train_folder_timm = ImageFolder(train_folder)
+    class_names = train_folder_timm.classes         
+                             
     if uploaded_file is not None:
         
         # Display the uploaded image
         image = Image.open(uploaded_file).convert('RGB')
-        st.sidebar.image(image, caption="Input Image", use_column_width=True)
+        st.sidebar.image(image, caption="Input Image", width='stretch')
         
         # resize image
         image_resized = image.resize((img_size, img_size))
