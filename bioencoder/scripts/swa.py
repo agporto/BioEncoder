@@ -71,7 +71,7 @@ def swa(
         os.remove(os.path.join(weights_dir, "swa"))
 
     ## scaler
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler("cuda")
     if not amp:
         scaler = None
     utils.set_seed()

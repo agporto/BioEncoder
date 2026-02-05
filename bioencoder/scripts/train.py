@@ -89,7 +89,6 @@ def train(
     aug_sample_n = aug_config.get("sample_n", 5)
     aug_sample_seed = aug_config.get("sample_seed", 42)
 
-
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
     log_dir = os.path.join(root_dir, "logs", run_name, stage)
@@ -166,7 +165,7 @@ def train(
     logger.info(f"Hyperparameters:\n{pretty_repr(hyperparams)}")
     
     ## scaler
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler("cuda")
     if not amp:
         scaler = None
         

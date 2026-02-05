@@ -337,7 +337,7 @@ def compute_embeddings(loader, model, scaler=None):
     Parameters:
         loader (torch.utils.data.DataLoader): DataLoader that provides images and labels.
         model (torch.nn.Module): Neural network model used to compute the embeddings.
-        scaler (torch.cuda.amp.autocast): Autocast context manager used to perform mixed-precision training.
+        scaler (torch.amp.autocast): Autocast context manager used to perform mixed-precision training.
 
     Returns:
         tuple: A tuple containing:
@@ -350,7 +350,7 @@ def compute_embeddings(loader, model, scaler=None):
     for images, labels in loader:
         images = images.cuda()
         if scaler:
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast("cuda"):
                 embed = model(images)
         else:
             embed = model(images)
@@ -379,7 +379,7 @@ def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, 
     - model (torch.nn.Module): The model that will be trained.
     - criterion (torch.nn.Module): The loss function to be used for training.
     - optimizer (torch.optim.Optimizer): The optimization algorithm to be used for training.
-    - scaler (torch.cuda.amp.GradScaler, optional): The scaler used for gradient scaling in case of mixed precision training.
+    - scaler (torch.amp.GradScaler, optional): The scaler used for gradient scaling in case of mixed precision training.
     - ema (ExponentialMovingAverage, optional): If provided, the exponential moving average to be applied to the model's parameters.
 
     Returns:
@@ -398,7 +398,7 @@ def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, 
             bsz = labels.shape[0]
 
         if scaler:
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast("cuda"):
                 embed = model(images)
                 if not loss_optimization:
                     f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
@@ -448,7 +448,7 @@ def validation_constructive(valid_loader, train_loader, model, scaler):
         valid_loader (torch.utils.data.DataLoader): DataLoader containing the validation data.
         train_loader (torch.utils.data.DataLoader): DataLoader containing the training data.
         model (torch.nn.Module): The model being trained.
-        scaler (torch.cuda.amp.GradScaler): The scaler used for gradient scaling in case of mixed precision training.
+        scaler (torch.amp.GradScaler): The scaler used for gradient scaling in case of mixed precision training.
 
     Returns:
         acc_dict (dict): A dictionary containing the accuracy metrics, computed using the `AccuracyCalculator` class.
@@ -484,7 +484,7 @@ def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
     model (torch.nn.Module): The model to be trained.
     criterion (torch.nn.Module): The loss function to be used for training.
     optimizer (torch.optim.Optimizer): The optimizer used to update model parameters.
-    scaler (torch.cuda.amp.GradScaler): The scaler used for gradient scaling in case of mixed precision training.
+    scaler (torch.amp.GradScaler): The scaler used for gradient scaling in case of mixed precision training.
     ema (Optional[torch.nn.Module]): The exponential moving average model.
 
     Returns:
@@ -498,7 +498,7 @@ def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
         data, target = data.cuda(), target.cuda()
         optimizer.zero_grad()
         if scaler:
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast("cuda"):
                 output = model(data)
                 loss = criterion(output, target)
                 train_loss.append(loss.item())
@@ -533,7 +533,7 @@ def validation_ce(model, criterion, valid_loader, scaler):
         with torch.no_grad():
             data, target = data.cuda(), target.cuda()
             if scaler:
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast("cuda"):
                     output = model(data)
                     if criterion:
                         loss = criterion(output, target)
@@ -560,53 +560,6 @@ def validation_ce(model, criterion, valid_loader, scaler):
 
     metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
     return metrics
-
-
-# def validation_ce(model, criterion, valid_loader, scaler):
-#     """
-#     Validates the given model with cross entropy loss and calculates several evaluation metrics such as accuracy, F1 scores and F1 score macro.
-
-#     Parameters:
-#     model (torch.nn.Module): The model to be validated.
-#     criterion (torch.nn.modules.loss._Loss): The criterion to be used for validation, which is cross entropy loss in this case.
-#     valid_loader (torch.utils.data.DataLoader): The data loader for validation dataset.
-#     scaler (torch.cuda.amp.autocast.Autocast): Optional scaler for using automatic mixed precision (AMP).
-
-#     Returns:
-#     dict: A dictionary containing the validation loss, accuracy, F1 scores, and F1 score macro.
-
-#     """
-#     model.eval()
-#     val_loss = []
-#     y_pred, y_true = [], []
-
-#     for data, target in valid_loader:
-#         with torch.no_grad():
-#             data, target = data.cuda(), target.cuda()
-#             if scaler:
-#                 with torch.cuda.amp.autocast():
-#                     output = model(data)
-#             else:
-#                 output = model(data)
-
-#             if criterion:
-#                 loss = criterion(output, target)
-#                 val_loss.append(loss.item())
-
-#             pred = output.argmax(dim=1)
-#             y_pred.extend(pred.cpu().numpy())
-#             y_true.extend(target.cpu().numpy())
-
-#             del data, target, output
-#             torch.cuda.empty_cache()
-
-#     valid_loss = np.mean(val_loss)
-#     f1_scores = f1_score(y_true, y_pred, average=None)
-#     f1_score_macro = f1_score(y_true, y_pred, average='macro')
-#     acc_score = accuracy_score(y_true, y_pred)
-
-#     metrics = {"loss": valid_loss, "accuracy": acc_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
-#     return metrics
 
 
 def copy_parameters_from_model(model):
