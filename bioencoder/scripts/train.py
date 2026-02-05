@@ -75,6 +75,7 @@ def train(
     ema_decay_per_epoch = hyperparams["train"]["ema_decay_per_epoch"]
     n_epochs = hyperparams["train"]["n_epochs"]
     target_metric = hyperparams["train"]["target_metric"]
+    min_improvement = hyperparams["train"].get("min_improvement", 0.01)
     stage = hyperparams["train"]["stage"]
     optimizer_params = hyperparams["optimizer"]
     scheduler_params = hyperparams["scheduler"]
@@ -319,15 +320,14 @@ def train(
                     pass
     
             # check if the best value of metric changed. If so -> save the model
-            if (
-                valid_metrics[target_metric] > metric_best*0.99
-            ):  # > 0 if wanting to save all models 
+            current_metric = valid_metrics[target_metric]
+            if metric_best == 0 or current_metric > metric_best * (1 + min_improvement):
                 logger.info(
-                    "{} increased ({:.6f} --> {:.6f}).  Saving model ...".format(
-                        target_metric, metric_best, valid_metrics[target_metric]
+                    "{} improved by ≥{:.2%} ({:.6f} --> {:.6f}). Saving model ...".format(
+                        target_metric, min_improvement, metric_best, current_metric
                     )
                 )
-    
+   
                 torch.save(
                     {
                         "epoch": epoch,
@@ -336,8 +336,10 @@ def train(
                     },
                     os.path.join(weights_dir, f"epoch{epoch}"),
                 )
-                metric_best = valid_metrics[target_metric]
-    
+                metric_best = current_metric
+            else:
+                logger.info(f"Metric {target_metric} did not improve by ≥{min_improvement:.2%} (best: {metric_best:.6f}, current: {current_metric:.6f})")
+
             # if ema is used, go back to regular weights without ema
             if ema:
                 utils.copy_parameters_to_model(copy_of_model_parameters, model)

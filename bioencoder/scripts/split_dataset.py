@@ -33,10 +33,10 @@ def split_dataset(
     image_dir : str
         Path to the directory containing subfolders of images, where each subfolder represents a class.
     mode : str, optional
-        Specifies the strategy for splitting the dataset:
-            - "flat": Calculating split to the most abundant class (after applying max_ratio), and then applying it to all classes 
-            - "random": Randomly selects images across all classes to form the validation set, disregarding class balance.
-            - "fixed": Ensures each class contributes a fixed proportion to the validation set, based on `val_percent`.
+        Strategy for populating the validation subset:
+            - "flat": Derives a single validation quota from the capped largest class (max_ratio), and applies it uniformly to all classes.
+            - "random": Builds the validation set by drawing images uniformly at random from the pooled, balanced dataset, ignoring class membership.
+            - "fixed": Assigns each class its own `val_percent` share to the validation set based on its balanced size.
         Default is "flat".
     val_percent : float, optional
         Proportion of the dataset to allocate to the validation set, expressed as a decimal.
