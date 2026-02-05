@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5
+- FIX: class order in model explorer was broken!
+- FIX: interactive plot was looking for a missing argument 
+- refactored code to remove torch and streamlit deprecation warnings
+
 ## 1.0.4
 - FIX: allow for alpha-channel in inference
 
