@@ -74,9 +74,9 @@ def lr_finder(
         "valid_batch_size": hyperparams["dataloaders"].get("valid_batch_size", None),
     }
     num_workers = hyperparams["dataloaders"].get("num_workers", 8)
-    num_iter = hyperparams.get("num_workers", 300)
+    num_iter = hyperparams.get("num_iter", 300)
     skip_start = hyperparams.get("skip_start", num_iter//10)
-    skip_end = hyperparams.get("save_figure", num_iter//10)
+    skip_end = hyperparams.get("skip_end", num_iter//10)
     return_LR = hyperparams.get("return_LR", False)
     save_figure = hyperparams.get("save_figure", False)
 
@@ -134,7 +134,7 @@ def lr_finder(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for the LR finder.")
+    parser.add_argument("--config-path",type=str, required=True, help="Path to the YAML configuration file that specifies hyperparameters for the LR finder.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 

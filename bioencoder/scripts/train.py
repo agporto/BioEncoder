@@ -78,7 +78,7 @@ def train(
     min_improvement = hyperparams["train"].get("min_improvement", 0.01)
     stage = hyperparams["train"]["stage"]
     optimizer_params = hyperparams["optimizer"]
-    scheduler_params = hyperparams["scheduler"]
+    scheduler_params = hyperparams.get("scheduler", None)
     criterion_params = hyperparams["criterion"]
     batch_sizes = {
         "train_batch_size": hyperparams["dataloaders"]["train_batch_size"],
@@ -99,15 +99,36 @@ def train(
         if os.path.exists(directory) and overwrite==True:
             print(f"removing {directory} (overwrite=True)")
             shutil.rmtree(directory)
-        os.makedirs(directory)
+        os.makedirs(directory, exist_ok=True)
         
     ## collect information on data
     train_dir, val_dir = os.path.join(data_dir, "train"), os.path.join(data_dir, "val")
-    class_names, data_stats = os.listdir(train_dir),{"data_dir": data_dir}
+    class_names = sorted(
+        [
+            class_name
+            for class_name in os.listdir(train_dir)
+            if os.path.isdir(os.path.join(train_dir, class_name))
+        ]
+    )
+    data_stats = {"data_dir": data_dir}
     data_stats["train"], data_stats["val"] = {},{}
     for class_name in class_names:
-        data_stats["train"][class_name] = len(os.listdir(os.path.join(train_dir, class_name)))
-        data_stats["val"][class_name] = len(os.listdir(os.path.join(val_dir, class_name)))
+        train_class_dir = os.path.join(train_dir, class_name)
+        val_class_dir = os.path.join(val_dir, class_name)
+        data_stats["train"][class_name] = len(
+            [
+                file_name
+                for file_name in os.listdir(train_class_dir)
+                if os.path.isfile(os.path.join(train_class_dir, file_name))
+            ]
+        )
+        data_stats["val"][class_name] = len(
+            [
+                file_name
+                for file_name in os.listdir(val_class_dir)
+                if os.path.isfile(os.path.join(val_class_dir, file_name))
+            ]
+        )
 
     ## set up logging and tensorboard writer
     writer = SummaryWriter(run_dir)
@@ -146,7 +167,7 @@ def train(
             optimizer_params["params"]["lr"] = kwargs.get("lr")
         if not "lr" in optimizer_params["params"].keys():
             if "second_lr" in config.__dict__.keys():
-                optimizer_params["params"] = {"lr": float(config.second_lr)}
+                optimizer_params["params"]["lr"] = float(config.second_lr)
                 logger.info(f"Using LR value from global bioencoder config: {config.second_lr}")
         else:
             lr = optimizer_params["params"]["lr"]
@@ -173,6 +194,14 @@ def train(
     ## set seed for entire pipeline
     utils.set_seed()
 
+    ## configure GPU before moving model to CUDA
+    assert torch.cuda.device_count() > 0, "No GPUs detected on this System (check your CUDA setup) - aborting."
+    if torch.cuda.device_count() == 1:
+        logger.info(f"Found one GPU: {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+    else:
+        logger.info(f"Found {torch.cuda.device_count()} GPUs, but unfortunately multi-GPU use isn't implemented yet.")
+        logger.info(f"Using GPU {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+
     # create model, loaders, optimizer, etc
     transforms = utils.build_transforms(hyperparams)    
     loaders = utils.build_loaders(
@@ -196,19 +225,6 @@ def train(
         logger.info(f"Saving augmentation samples: {aug_sample_n} per class to data/{run_name}/aug_sample")
 
     logger.info(f"Using backbone: {backbone}")
-    
-    ## configure GPU 
-    assert torch.cuda.device_count() > 0, "No GPUs detected on this System (check your CUDA setup) - aborting."
-    if torch.cuda.device_count() == 1:
-        logger.info(f"Found one GPU: {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
-    else:
-        logger.info(f"Found {torch.cuda.device_count()} GPUs, but unfortunately multi-GPU use isn't implemented yet.")
-        logger.info(f"Using GPU {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
-        
-        # ## set cuda device
-        # torch.cuda.set_device(cuda_device)
-        # print(f"Using CUDA device {cuda_device}")
-        # model = torch.nn.DataParallel(model)   
 
     ## configure optimizer
     optim = utils.build_optim(
@@ -220,8 +236,11 @@ def train(
         optim["scheduler"],
         optim["loss_optimizer"],
     )
+    scheduler_step_per_batch = isinstance(scheduler, torch.optim.lr_scheduler.CyclicLR)
+    scheduler_requires_metric = isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
     if ema:
-        iters = len(loaders["train_loader"])
+        active_train_loader = loaders["train_supcon_loader"] if stage == "first" else loaders["train_loader"]
+        iters = len(active_train_loader)
         ema_decay = ema_decay_per_epoch ** (1 / iters)
         ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
 
@@ -242,7 +261,9 @@ def train(
                     optimizer, 
                     scaler, 
                     ema, 
-                    loss_optimizer
+                    loss_optimizer,
+                    scheduler=scheduler,
+                    scheduler_step_per_batch=scheduler_step_per_batch,
                 )
             else:
                 train_metrics = utils.train_epoch_ce(
@@ -252,6 +273,8 @@ def train(
                     optimizer,
                     scaler,
                     ema,
+                    scheduler=scheduler,
+                    scheduler_step_per_batch=scheduler_step_per_batch,
                 )
             end_training_time = time.time()
     
@@ -302,6 +325,12 @@ def train(
                         pretty_repr(valid_metrics),
                 )
                 logger.info("\n".join(line if i == 0 else "    " + line for i, line in enumerate(message.split("\n"))))
+
+            if target_metric not in valid_metrics:
+                raise ValueError(
+                    f"target_metric='{target_metric}' not found in validation metrics. "
+                    f"Available metrics: {list(valid_metrics.keys())}"
+                )
     
             # write train and valid metrics to the logs
             utils.add_to_tensorboard_logs(
@@ -344,7 +373,11 @@ def train(
             if ema:
                 utils.copy_parameters_to_model(copy_of_model_parameters, model)
     
-            scheduler.step()
+            if scheduler is not None:
+                if scheduler_requires_metric:
+                    scheduler.step(valid_metrics[target_metric])
+                elif not scheduler_step_per_batch:
+                    scheduler.step()
             logger.info(utils.pprint_fill_hbar(f"END - Epoch {epoch}"))
     else:
         logger.info(utils.pprint_fill_hbar("DRY-RUN ONLY - NO TRAINING"))
@@ -355,7 +388,7 @@ def train(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file that specifies detailed training and optimizer parameters.")
+    parser.add_argument("--config-path",type=str, required=True, help="Path to the YAML configuration file that specifies detailed training and optimizer parameters.")
     parser.add_argument("--dry-run", action='store_true', help="Run without starting the training to inspect config and augmentations.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()

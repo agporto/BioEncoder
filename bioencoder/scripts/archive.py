@@ -112,11 +112,36 @@ def archive(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", type=bool, default=False, help="Include the 'data' directory in the archive (default: False)")
-    parser.add_argument("--logs", type=bool, default=True, help="Include the 'logs' directory in the archive (default: True)")
-    parser.add_argument("--plots", type=bool, default=True, help="Include the 'plots' directory in the archive (default: True)")
-    parser.add_argument("--runs", type=bool, default=True, help="Include the 'runs' directory in the archive (default: True)")
-    parser.add_argument("--weights", type=bool, default=False, help="Include the 'weights' directory in the archive (default: False)")
+    parser.add_argument(
+        "--data",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include the 'data' directory in the archive (default: False)",
+    )
+    parser.add_argument(
+        "--logs",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include the 'logs' directory in the archive (default: True)",
+    )
+    parser.add_argument(
+        "--plots",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include the 'plots' directory in the archive (default: True)",
+    )
+    parser.add_argument(
+        "--runs",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include the 'runs' directory in the archive (default: True)",
+    )
+    parser.add_argument(
+        "--weights",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include the 'weights' directory in the archive (default: False)",
+    )
     parser.add_argument("--export-dir", type=str, help="Directory to save the zipped archive")
     args = parser.parse_args()
 

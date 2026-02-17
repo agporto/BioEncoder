@@ -122,7 +122,11 @@ def scale(arr):
         The rescaled numpy array with values in the range [0, 255].
     """
 
-    return ((arr - arr.min()) * (1 / (arr.max() - arr.min()) * 255)).astype("uint8")
+    arr_min = arr.min()
+    arr_max = arr.max()
+    if arr_max == arr_min:
+        return np.zeros_like(arr, dtype="uint8")
+    return ((arr - arr_min) * (1 / (arr_max - arr_min) * 255)).astype("uint8")
 
 def gen_coords(i, patch_size, stride, dim1, dim2):
     """
@@ -180,9 +184,15 @@ def normalize_and_scale_features(features, n_sigma=1):
     numpy array: A normalized and scaled array of features.
 
     """
-    scaled_features = (features - np.mean(features)) / (np.std(features) )
+    std = np.std(features)
+    if std == 0:
+        return np.zeros_like(features)
+    scaled_features = (features - np.mean(features)) / std
     scaled_features = np.clip(scaled_features, -n_sigma, n_sigma)
-    scaled_features = (scaled_features - scaled_features.min()) / (scaled_features.max()-scaled_features.min())
+    denom = scaled_features.max() - scaled_features.min()
+    if denom == 0:
+        return np.zeros_like(scaled_features)
+    scaled_features = (scaled_features - scaled_features.min()) / denom
     return scaled_features
 
 def pca_decomposition(x, n_components=3):
@@ -217,7 +227,8 @@ def feature_map_normalization(f):
 
     """
     act_map = torch.sum(f, dim=1).unsqueeze(1)
-    act_map /= act_map.max()
+    max_val = act_map.max().clamp_min(1e-12)
+    act_map /= max_val
     return act_map
 
 def embbedings_dimension_reductions(data_table, perplexity, seed):
@@ -234,7 +245,8 @@ def embbedings_dimension_reductions(data_table, perplexity, seed):
     """
     mean = np.mean(data_table, axis=0)
     std = np.std(data_table, axis=0)
-    norm_data = (data_table - mean) / std
+    std_safe = np.where(std == 0, 1.0, std)
+    norm_data = (data_table - mean) / std_safe
     
     ## PCA 
     pca_obj = decomposition.PCA(n_components=2)

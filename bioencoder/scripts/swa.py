@@ -87,8 +87,21 @@ def swa(
         ckpt_pretrained=None,
     ).cuda()
 
-    ## inspect epochs
-    list_of_epochs = sorted([int(x.split("epoch")[1]) for x in os.listdir(weights_dir)])
+    ## inspect available checkpoints (epochN files only)
+    epoch_files = [
+        x for x in os.listdir(weights_dir)
+        if x.startswith("epoch") and x[len("epoch"):].isdigit()
+    ]
+    list_of_epochs = sorted([int(x.split("epoch")[1]) for x in epoch_files])
+    if len(list_of_epochs) == 0:
+        raise FileNotFoundError(f"No epoch checkpoints found in: {weights_dir}")
+    if top_k_checkoints <= 0:
+        raise ValueError(f"top_k_checkpoints must be > 0, got {top_k_checkoints}")
+    if len(list_of_epochs) < top_k_checkoints:
+        print(
+            f"Warning: requested top_k_checkpoints={top_k_checkoints}, "
+            f"but only found {len(list_of_epochs)} checkpoints. Using all available."
+        )
     best_epochs = list_of_epochs[-top_k_checkoints::]
 
     checkpoints_paths = [
@@ -126,7 +139,7 @@ def swa(
 def cli():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file that specifies hyperparameters for SWA.")
+    parser.add_argument("--config-path",type=str, required=True, help="Path to the YAML configuration file that specifies hyperparameters for SWA.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 

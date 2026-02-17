@@ -20,7 +20,6 @@ timm.list_models()[:5]
 - `SupCon`: SupConLoss is a supervised contrastive loss function that encourages similar examples to be closer in the embedding space while pushing dissimilar examples apart.
 - `LabelSmoothing`: LabelSmoothingLoss applies label smoothing to reduce overfitting by smoothing the labels, thereby preventing the model from becoming too confident in its predictions.
 - `CrossEntropy`: nn.CrossEntropyLoss is a common loss function used in classification tasks, combining nn.LogSoftmax and nn.NLLLoss in one single class.
-- `KLDiv`: nn.KLDivLoss measures how one probability distribution diverges from a second, expected probability distribution.
 - `SubCenterArcFace`: SubCenterArcFaceLoss is a variant of ArcFace loss that introduces sub-centers for better intra-class compactness and inter-class discrepancy.
 - `ArcFace`: ArcFaceLoss is used to enhance face recognition models by adding an angular margin to the softmax function, improving discriminative power.
 

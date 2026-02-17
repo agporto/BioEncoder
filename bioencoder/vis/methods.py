@@ -23,11 +23,16 @@ def visualize_filters(model, filter_name = None, max_filters = 64, size = 128, s
             weights = layer_weights 
           
     w_size = weights.size()
+    if len(w_size) != 4:
+        raise ValueError(
+            f"Selected layer '{filter_name}' is not convolutional (weight shape: {tuple(w_size)})."
+        )
     merged_weights = weights.reshape(w_size[0] * w_size[1], w_size[2], w_size[2]).cpu().detach().numpy()
     channels = merged_weights.shape[0]
     
     if channels > max_filters:
-        merged_weights = merged_weights[torch.randperm(channels)[:max_filters]]
+        selected = np.random.choice(channels, size=max_filters, replace=False)
+        merged_weights = merged_weights[selected]
         channels = max_filters    
     
     sqrt = int(channels**0.5)
@@ -129,7 +134,11 @@ def grad_cam(model, module, img, target_layer = ["4"],
     heatmap = np.float32(heatmap) / 255
 
     cam = heatmap[:,:,::-1] + np.float32(img)/ 255
-    cam = cam / np.max(cam)
+    cam_max = np.max(cam)
+    if cam_max > 0:
+        cam = cam / cam_max
+    else:
+        cam = np.zeros_like(cam)
     cam = np.uint8(255 * cam)
 
     gb_model = GuidedBackpropReLUModel(model=model.encoder, use_cuda = use_cuda)
@@ -177,7 +186,11 @@ def contrast_cam(model, module, img, target_layer = ["4"], target_category= None
     heatmap = np.float32(heatmap) / 255
 
     cam = heatmap[:,:,::-1] + np.float32(img)/ 255
-    cam = cam / np.max(cam)
+    cam_max = np.max(cam)
+    if cam_max > 0:
+        cam = cam / cam_max
+    else:
+        cam = np.zeros_like(cam)
     cam = np.uint8(255 * cam)
 
     gb_model = GuidedBackpropReLUModel(model=model.encoder, use_cuda = use_cuda)

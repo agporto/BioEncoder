@@ -60,7 +60,11 @@ def get_aug_from_config(config):
     elif name == "OneOf":
         return A.OneOf([get_aug_from_config(c) for c in args], **config)
     elif name == "OneOrOther":
-        return A.OneOrOther([get_aug_from_config(c) for c in args], **config)
+        if len(args) != 2:
+            raise ValueError("OneOrOther requires exactly two transforms in 'args'.")
+        first = get_aug_from_config(args[0])
+        second = get_aug_from_config(args[1])
+        return A.OneOrOther(first=first, second=second, **config)
     elif name == "SomeOf":
         return A.SomeOf([get_aug_from_config(c) for c in args], **config)
     else:

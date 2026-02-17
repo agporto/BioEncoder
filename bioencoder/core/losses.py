@@ -26,6 +26,10 @@ class SupConLoss(nn.Module):
 
     def __init__(self, temperature=0.07, contrast_mode="all", base_temperature=0.07):
         super(SupConLoss, self).__init__()
+        if temperature <= 0:
+            raise ValueError("temperature must be > 0")
+        if base_temperature <= 0:
+            raise ValueError("base_temperature must be > 0")
         self.temperature = temperature
         self.contrast_mode = contrast_mode
         self.base_temperature = base_temperature
@@ -98,14 +102,22 @@ class SupConLoss(nn.Module):
 
         # compute log_prob
         exp_logits = torch.exp(logits) * logits_mask
-        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
+        exp_logits_sum = exp_logits.sum(1, keepdim=True).clamp_min(1e-12)
+        log_prob = logits - torch.log(exp_logits_sum)
 
         # compute mean of log-likelihood over positive
-        mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+        mask_sum = mask.sum(1)
+        valid_anchor_mask = mask_sum > 0
+        mean_log_prob_pos = torch.zeros_like(mask_sum)
+        mean_log_prob_pos[valid_anchor_mask] = (
+            (mask * log_prob).sum(1)[valid_anchor_mask] / mask_sum[valid_anchor_mask]
+        )
 
         # loss
         loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
-        loss = loss.view(anchor_count, batch_size).mean()
+        if not torch.any(valid_anchor_mask):
+            return logits.sum() * 0.0
+        loss = loss[valid_anchor_mask].mean()
 
         return loss
 
@@ -128,6 +140,10 @@ class LabelSmoothingLoss(nn.Module):
     """
     def __init__(self, classes, smoothing=0, dim=-1):
         super(LabelSmoothingLoss, self).__init__()
+        if not isinstance(classes, int) or classes <= 1:
+            raise ValueError("classes must be an integer > 1")
+        if not (0 <= smoothing < 1):
+            raise ValueError("smoothing must be in the range [0, 1)")
         self.confidence = 1.0 - smoothing
         self.smoothing = smoothing
         self.cls = classes
@@ -136,14 +152,28 @@ class LabelSmoothingLoss(nn.Module):
     def forward(self, pred:torch.Tensor, target:torch.Tensor):
         if not isinstance(pred, torch.Tensor) or not isinstance(target, torch.Tensor):
             raise TypeError("Inputs must be tensors")
+        if pred.ndim < 2:
+            raise ValueError("pred must be at least 2-dimensional [batch, classes, ...]")
         if pred.shape[0] != target.shape[0]:
             raise ValueError("Input tensors must have the same batch size")
+        class_dim = self.dim if self.dim >= 0 else pred.ndim + self.dim
+        if pred.shape[class_dim] != self.cls:
+            raise ValueError(
+                f"pred class dimension ({pred.shape[class_dim]}) does not match configured classes ({self.cls})"
+            )
+        if not torch.is_floating_point(pred):
+            raise TypeError("pred must be a floating-point tensor")
+        if target.dtype not in (torch.int8, torch.int16, torch.int32, torch.int64):
+            raise TypeError("target must be an integer tensor")
+        if target.numel() > 0:
+            if target.min() < 0 or target.max() >= self.cls:
+                raise ValueError("target contains class indices outside valid range [0, classes-1]")
             
         pred = pred.log_softmax(dim=self.dim)
         with torch.no_grad():
             true_dist = torch.zeros_like(pred)
             true_dist.fill_(self.smoothing / (self.cls - 1))
-            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+            true_dist.scatter_(1, target.unsqueeze(1), self.confidence)
         return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
 
 
@@ -151,7 +181,6 @@ LOSSES = {
     "SupCon": SupConLoss,
     "LabelSmoothing": LabelSmoothingLoss,
     "CrossEntropy": nn.CrossEntropyLoss,
-    "KLDiv": nn.KLDivLoss,
     'SubCenterArcFace': losses.SubCenterArcFaceLoss,
     'ArcFace': losses.ArcFaceLoss,
 }

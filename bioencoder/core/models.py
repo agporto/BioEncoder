@@ -6,6 +6,52 @@ import timm
 from .backbones import BACKBONES
 
 
+def _infer_features_dim(model: nn.Module) -> int:
+    """Infer encoder output dimensionality from common classifier heads."""
+    if hasattr(model, "num_features") and isinstance(model.num_features, int):
+        return model.num_features
+
+    if hasattr(model, "fc") and isinstance(model.fc, nn.Linear):
+        return model.fc.in_features
+
+    if hasattr(model, "classifier"):
+        classifier = model.classifier
+        if isinstance(classifier, nn.Linear):
+            return classifier.in_features
+        if isinstance(classifier, nn.Sequential):
+            for layer in reversed(list(classifier)):
+                if isinstance(layer, nn.Linear):
+                    return layer.in_features
+                if isinstance(layer, nn.Conv2d):
+                    return layer.in_channels
+
+    if hasattr(model, "get_classifier"):
+        try:
+            classifier = model.get_classifier()
+            if isinstance(classifier, nn.Linear):
+                return classifier.in_features
+        except Exception:
+            pass
+
+    for layer in reversed(list(model.modules())):
+        if isinstance(layer, nn.Linear):
+            return layer.in_features
+        if isinstance(layer, nn.Conv2d):
+            return layer.out_channels
+
+    raise TypeError("Failed to infer feature dimension for the selected backbone.")
+
+
+def _build_torchvision_model(backbone: str):
+    constructor = BACKBONES.get(backbone)
+    if constructor is None:
+        raise KeyError(backbone)
+    try:
+        return constructor(weights="DEFAULT")
+    except TypeError:
+        return constructor(pretrained=True)
+
+
 def create_encoder(backbone:str):
     """
     Creates an encoder from the specified backbone.
@@ -26,25 +72,25 @@ def create_encoder(backbone:str):
     
     """
     try:
-        if 'timm_' in backbone:
-            backbone = backbone[5:]
-            model = timm.create_model(model_name=backbone, pretrained=True)
-        else:
-            model = BACKBONES[backbone](pretrained=True)
-    except RuntimeError or KeyError:
-        raise RuntimeError('Specify the correct backbone name. Either one of torchvision backbones, or a timm backbone.'
-                           'For timm - add prefix \'timm_\'. For instance, timm_resnet18')
+        if backbone.startswith("timm_"):
+            model_name = backbone[len("timm_"):]
+            model = timm.create_model(
+                model_name=model_name,
+                pretrained=True,
+                num_classes=0,
+                global_pool="avg",
+            )
+            features_dim = _infer_features_dim(model)
+            return model, features_dim
 
-    layers = torch.nn.Sequential(*list(model.children()))
-    try:
-        potential_last_layer = layers[-1]
-        while not isinstance(potential_last_layer, nn.Linear):
-            potential_last_layer = potential_last_layer[-1]
-    except TypeError:
-        raise TypeError('Failed to find the linear layer of the model')
-
-    features_dim = potential_last_layer.in_features
-    model = torch.nn.Sequential(*list(model.children())[:-1])
+        model = _build_torchvision_model(backbone)
+        features_dim = _infer_features_dim(model)
+        model = torch.nn.Sequential(*list(model.children())[:-1])
+    except (RuntimeError, KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "Specify a correct backbone name. Use a valid torchvision model name, "
+            "or prefix a valid timm model with 'timm_' (e.g., timm_resnet18)."
+        ) from exc
 
     return model, features_dim
 

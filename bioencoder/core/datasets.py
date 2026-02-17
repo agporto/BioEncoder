@@ -28,7 +28,7 @@ class BioDataset(ImageFolder):
             tuple: Tuple of the transformed image and its label.
         """
         path, label = self.samples[idx]
-        img = self.loader(path)
+        img = self.loader(path).convert("RGB")
         image = np.asarray(img)
 
         if self.second_stage:

@@ -123,8 +123,14 @@ def interactive_plots(
     df_embeddings = df_embeddings.sort_values(by=["class_str", "dataset","image_name"]).reset_index(drop=True)
 
     ## Reduce dimensionality
-    if not perplexity:
-        perplexity = min(30, max(5, (len(df_embeddings) - 1) / 3))
+    n_samples = len(df_embeddings)
+    if n_samples < 3:
+        raise ValueError(f"Need at least 3 samples for dimensionality reduction, got {n_samples}.")
+    max_valid_perplexity = max(1.0, float(n_samples - 1))
+    if perplexity is None:
+        perplexity = min(30.0, max(5.0, (n_samples - 1) / 3))
+    perplexity = min(float(perplexity), max_valid_perplexity - 1e-6)
+    perplexity = max(perplexity, 1.0)
     print(f"tSNE: using perplexity {perplexity}")
     # Reduce on numeric embedding columns only
     embedding_matrix = df_embeddings.select_dtypes(include=[np.number])
@@ -149,7 +155,7 @@ def interactive_plots(
 def cli():
         
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path", type=str, help="Path to the YAML configuration file to create interactive plots.")
+    parser.add_argument("--config-path", type=str, required=True, help="Path to the YAML configuration file for interactive plots.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
     args = parser.parse_args()
 

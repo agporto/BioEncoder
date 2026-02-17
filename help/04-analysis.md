@@ -37,8 +37,8 @@ bioencoder_inference --config-path "bioencoder_configs/inference.yml" --path "pa
 
 optional arguments:
   -h, --help            show this help message and exit
-  --config-path CONFIG_PATH		Path to the YAML configuration file to create interactive plots.
-  --path PATH          			Path to image or folder to embedd / classify.
+  --config-path CONFIG_PATH		Path to the YAML configuration file for inference.
+  --path PATH          			Path to an image file or directory to embed/classify.
   --save-path SAVE_PATH 		Path to CSV file with results.
   --overwrite           		Overwrite CSV file with results.
 ```

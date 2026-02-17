@@ -12,6 +12,19 @@ from bioencoder import config, utils
 
 #%% function
 
+VALID_IMAGE_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"
+}
+
+
+def _list_image_files(directory):
+    return [
+        file_name
+        for file_name in os.listdir(directory)
+        if os.path.isfile(os.path.join(directory, file_name))
+        and os.path.splitext(file_name)[1].lower() in VALID_IMAGE_EXTENSIONS
+    ]
+
 def split_dataset(
         image_dir, 
         mode="flat",
@@ -100,8 +113,21 @@ def split_dataset(
         print("\n[dry run - not actually copying files]\n")
     
     ## get images 
-    class_names = os.listdir(image_dir)
-    all_n_images = [len(os.listdir(os.path.join(image_dir, cls))) for cls in class_names]  
+    image_dir = os.path.expanduser(image_dir)
+    class_names = sorted(
+        [
+            class_name
+            for class_name in os.listdir(image_dir)
+            if os.path.isdir(os.path.join(image_dir, class_name))
+        ]
+    )
+    class_image_files = {
+        class_name: _list_image_files(os.path.join(image_dir, class_name))
+        for class_name in class_names
+    }
+    assert len(class_names) > 0, "No class subdirectories found in image_dir."
+    all_n_images = [len(class_image_files[class_name]) for class_name in class_names]
+    rng = random.Random(random_seed)
     
     print(f"Number of images per class prior to balancing: {all_n_images} ({sum(all_n_images)} total)")
     assert (
@@ -127,8 +153,7 @@ def split_dataset(
         for class_name, class_n_images in zip(class_names, all_n_images_balanced):
             print(f"Processing class {class_name}...")
             class_dir = os.path.join(image_dir, class_name)
-            random.seed(random_seed)
-            class_images_selection = random.sample(os.listdir(class_dir), class_n_images)          
+            class_images_selection = rng.sample(class_image_files[class_name], class_n_images)
 
             ## check min training imgs
             n_train_imgs = len(class_images_selection) - class_n_images_val
@@ -159,12 +184,13 @@ def split_dataset(
         for class_name, class_n_images in zip(class_names, all_n_images_balanced):
             print(f"Processing class {class_name}...")
             class_dir = os.path.join(image_dir, class_name)
-            random.seed(random_seed)
-            class_images_selection = class_images_selection + [os.path.join(class_dir, image_name) for image_name in random.sample(os.listdir(class_dir), class_n_images)]
+            class_images_selection = class_images_selection + [
+                os.path.join(class_dir, image_name)
+                for image_name in rng.sample(class_image_files[class_name], class_n_images)
+            ]
             
         ## subample from balanced set and apply split
-        random.seed(random_seed)
-        val_set = random.sample(class_images_selection, n_images_val)
+        val_set = rng.sample(class_images_selection, n_images_val)
         train_set = set(class_images_selection) - set(val_set)
         if not dry_run:
             for image_set, target_dir in zip([val_set, train_set], [val_directory, train_directory]):
@@ -187,8 +213,7 @@ def split_dataset(
         for class_name, class_n_images in zip(class_names, all_n_images_balanced):
             print(f"Processing class {class_name}...")
             class_dir = os.path.join(image_dir, class_name)
-            random.seed(random_seed)
-            class_images_selection = random.sample(os.listdir(class_dir), class_n_images)
+            class_images_selection = rng.sample(class_image_files[class_name], class_n_images)
             val_set = class_images_selection[:int(class_n_images * val_percent)]
             train_set = class_images_selection[int(class_n_images * val_percent):]
             if not dry_run:
@@ -203,7 +228,7 @@ def split_dataset(
 def cli():
        
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image-dir", type=str, help="Path to the images directory sorted into class-specific subfolders.")
+    parser.add_argument("--image-dir", type=str, required=True, help="Path to the images directory sorted into class-specific subfolders.")
     parser.add_argument("--mode", type=str, choices=['flat', 'random', 'fixed'], default='flat', help="Type of dataset split to perform.")
     parser.add_argument("--val-percent", type=float, default=0.1, help="Percentage of data to use as validation set.")
     parser.add_argument("--max-ratio", type=int, default=7, help="Maximum ratio between the most and least abundant classes.")

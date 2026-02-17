@@ -137,7 +137,11 @@ class GradCam:
         cam = np.maximum(cam, 0)
         cam = cv2.resize(cam, (input_img.shape[3], input_img.shape[2]))
         cam = cam - np.min(cam)
-        cam = cam / np.max(cam)
+        cam_max = np.max(cam)
+        if cam_max > 0:
+            cam = cam / cam_max
+        else:
+            cam = np.zeros_like(cam)
         return cam
 
 
@@ -154,13 +158,6 @@ class GuidedBackpropReLU(Function):
     def forward(self, input_img):
         """
         The forward pass method of the activation function.
-  Cell In[303], line 1
-    class_names = os.list.dir(os.path.join(root_dir, "data", run_name))
-
-AttributeError: module 'os' has no attribute 'list'
-
-
-In 
         Args:
             input_img (torch.Tensor): input image tensor.
 
@@ -288,8 +285,10 @@ class ContrastCam:
 
         #Change from GradCam
         ce_loss = nn.CrossEntropyLoss()
-        im_label_as_var = Variable(torch.from_numpy(np.asarray([target_category])))
-        pred_loss = ce_loss(output.cuda(), im_label_as_var.cuda()) 
+        im_label_as_var = Variable(torch.from_numpy(np.asarray([target_category], dtype=np.int64)))
+        if self.cuda:
+            im_label_as_var = im_label_as_var.cuda()
+        pred_loss = ce_loss(output, im_label_as_var)
 
 
         self.feature_module.zero_grad()
@@ -310,5 +309,9 @@ class ContrastCam:
         cam = np.maximum(cam, 0)
         cam = cv2.resize(cam, (input_img.shape[3], input_img.shape[2]))
         cam = cam - np.min(cam)
-        cam = cam / np.max(cam)
+        cam_max = np.max(cam)
+        if cam_max > 0:
+            cam = cam / cam_max
+        else:
+            cam = np.zeros_like(cam)
         return cam

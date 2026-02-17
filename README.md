@@ -17,7 +17,7 @@ Read the paper: [https://onlinelibrary.wiley.com/doi/10.1111/ele.14495](https://
 - Access to state-of-the-art metric losses, such as [Supcon](https://arxiv.org/abs/2004.11362) and [Sub-center ArcFace](https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123560715.pdf).
 - [Exponential Moving Average](https://github.com/fadel/pytorch_ema) for stable training, and Stochastic Moving Average for better generalization and performance.
 - [LRFinder](https://github.com/davidtvs/pytorch-lr-finder) for the second stage of the training.
-- Easy customization of hyperparameters, including augmentations, through `YAML` configs (check the [config-templates](config-templates) folder for examples)
+- Easy customization of hyperparameters, including augmentations, through `YAML` configs (check the `bioencoder_configs` folder for examples)
 - Custom augmentations techniques via [albumentations](https://github.com/albumentations-team/albumentations)
 - TensorBoard logs and checkpoints (soon to come: WandB integration)
 - Streamlit app with rich model visualizations (e.g., [Grad-CAM](https://arxiv.org/abs/1610.02391) and [timm-vis](https://github.com/novice03/timm-vis/blob/main/details.ipynb))

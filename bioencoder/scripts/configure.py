@@ -64,9 +64,9 @@ def configure(
 def cli():  
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root-dir", type=str, default=None)
-    parser.add_argument("--run-name", type=str, default=None)
-    parser.add_argument("--create", type=bool, default=False)
+    parser.add_argument("--root-dir", type=str, required=True, help="BioEncoder working directory.")
+    parser.add_argument("--run-name", type=str, required=True, help="Run name used for outputs.")
+    parser.add_argument("--create", action="store_true", help="Create root directory if it does not exist.")
     args = parser.parse_args()
 
     configure(**vars(args))

@@ -102,10 +102,15 @@ def model_explorer(
         stage
         )
     
-    ## get class names
-    train_folder = os.path.join(root_dir, "data", run_name, "train")
-    train_folder_timm = ImageFolder(train_folder)
-    class_names = train_folder_timm.classes         
+    ## class names are only needed for contrastive CAM in stage 2
+    class_names = None
+    if stage != "first":
+        train_folder = os.path.join(root_dir, "data", run_name, "train")
+        if os.path.isdir(train_folder):
+            train_folder_timm = ImageFolder(train_folder)
+            class_names = train_folder_timm.classes
+        else:
+            class_names = hyperparams["model"].get("class_names", None)
                              
     if uploaded_file is not None:
         
@@ -147,6 +152,12 @@ def model_explorer(
             st.pyplot(result)
 
         elif selected == 'ConstrativeCAM':
+            if not class_names:
+                st.error(
+                    "Class names are unavailable. Provide data/<run_name>/train or "
+                    "set model.class_names in the explorer config."
+                )
+                return
             layers =[name.split('.')[0] for name, module in model.encoder.named_modules() \
                      if isinstance(module, (torch.nn.SiLU, torch.nn.ReLU))]
             layer_set = sorted(set(layers))

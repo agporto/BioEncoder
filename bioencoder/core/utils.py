@@ -17,7 +17,7 @@ from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import f1_score #, accuracy_score
 
 from .losses import LOSSES
-from .optimizers import OPTIMIZERS
+from .optimizers import OPTIMIZERS, LOOKAHEAD_CLASS
 from .schedulers import SCHEDULERS
 from .models import BioEncoderModel
 from .datasets import create_dataset
@@ -100,7 +100,7 @@ def set_seed(seed=42):
 
     """
     random.seed(seed)
-    os.environ["PYHTONHASHSEED"] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -244,7 +244,8 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         shuffle=False,
         num_workers=num_workers, 
         pin_memory=True, 
-        drop_last=drop_last
+        # Keep all validation samples for unbiased validation metrics.
+        drop_last=False
     )
     
     loaders = {
@@ -265,7 +266,8 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
             batch_size=batch_sizes['train_batch_size'], 
             shuffle=True,
             num_workers=num_workers, 
-            pin_memory=True
+            pin_memory=True,
+            drop_last=drop_last and batch_sizes['train_batch_size'] is not None
         )
 
         loaders['train_supcon_loader'] = train_supcon_loader
@@ -316,12 +318,38 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
     else:
         criterion = LOSSES[loss_params['name']]()
     
+    def create_optimizer(parameters, spec):
+        name = spec["name"]
+        params = spec.get("params", {})
+        if name == "LookAhead":
+            cfg = params.copy()
+            base_name = cfg.pop("base_optimizer", "Adam")
+            explicit_base_params = cfg.pop("base_params", None)
+            wrapper_keys = {"k", "alpha", "pullback_momentum"}
+            wrapper_params = {k: cfg.pop(k) for k in list(cfg.keys()) if k in wrapper_keys}
+            if explicit_base_params is None:
+                base_params = cfg
+            else:
+                base_params = {**cfg, **explicit_base_params}
+
+            if base_name not in OPTIMIZERS:
+                raise ValueError(
+                    f"LookAhead base_optimizer '{base_name}' is not supported. "
+                    f"Choose one of: {list(OPTIMIZERS.keys())}"
+                )
+            base_optimizer = OPTIMIZERS[base_name](parameters, **base_params)
+            return LOOKAHEAD_CLASS(base_optimizer, **wrapper_params)
+
+        if name not in OPTIMIZERS:
+            raise ValueError(f"Optimizer '{name}' is not supported. Choose one of: {list(OPTIMIZERS.keys()) + ['LookAhead']}")
+        return OPTIMIZERS[name](parameters, **params)
+
     if 'optimizer' in loss_params:
-        loss_optimizer =  OPTIMIZERS[loss_params["optimizer"]["name"]](criterion.parameters(), **loss_params["optimizer"]["params"])
+        loss_optimizer = create_optimizer(criterion.parameters(), loss_params["optimizer"])
     else:
         loss_optimizer = None
 
-    optimizer = OPTIMIZERS[optimizer_params["name"]](model.parameters(), **optimizer_params["params"])
+    optimizer = create_optimizer(model.parameters(), optimizer_params)
 
     if scheduler_params:
         scheduler = SCHEDULERS[scheduler_params["name"]](optimizer, **scheduler_params["params"])
@@ -368,7 +396,17 @@ def compute_embeddings(loader, model, scaler=None):
     return np.float32(total_embeddings), np.uint8(total_labels)
 
 
-def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, ema, loss_optimizer):
+def train_epoch_constructive(
+    train_loader,
+    model,
+    criterion,
+    optimizer,
+    scaler,
+    ema,
+    loss_optimizer,
+    scheduler=None,
+    scheduler_step_per_batch=False,
+):
     """
     Trains the `model` on the data from the `train_loader` for one epoch. The loss function is defined by `criterion` and
     the optimization algorithm is defined by `optimizer`. The training process can also be scaled using the `scaler` and
@@ -434,6 +472,9 @@ def train_epoch_constructive(train_loader, model, criterion, optimizer, scaler, 
             if loss_optimization:
                 loss_optimizer.step()
 
+        if scheduler_step_per_batch and scheduler is not None:
+            scheduler.step()
+
         if ema:
             ema.update(model.parameters())
 
@@ -475,7 +516,16 @@ def validation_constructive(valid_loader, train_loader, model, scaler):
     return acc_dict
 
 
-def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
+def train_epoch_ce(
+    train_loader,
+    model,
+    criterion,
+    optimizer,
+    scaler,
+    ema,
+    scheduler=None,
+    scheduler_step_per_batch=False,
+):
     """
     Train the model for one epoch using cross-entropy loss.
 
@@ -512,6 +562,9 @@ def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
             loss.backward()
             optimizer.step()
 
+        if scheduler_step_per_batch and scheduler is not None:
+            scheduler.step()
+
         if ema:
             ema.update(model.parameters())
 
@@ -524,10 +577,9 @@ def train_epoch_ce(train_loader, model, criterion, optimizer, scaler, ema):
 def validation_ce(model, criterion, valid_loader, scaler):
     model.eval()
     val_loss = []
-    valid_bs = valid_loader.batch_size
-    # note that it's okay to do len(loader) * bs, since drop_last=True is enabled
-    y_pred, y_true = np.zeros(len(valid_loader)*valid_bs), np.zeros(len(valid_loader)*valid_bs)
+    y_pred, y_true = [], []
     correct_samples = 0
+    total_samples = 0
 
     for batch_i, (data, target) in enumerate(valid_loader):
         with torch.no_grad():
@@ -544,19 +596,22 @@ def validation_ce(model, criterion, valid_loader, scaler):
                     loss = criterion(output, target)
                     val_loss.append(loss.item())
 
-            correct_samples += (
-                target.detach().cpu().numpy() == np.argmax(output.detach().cpu().numpy(), axis=1)
-            ).sum()
-            y_pred[batch_i * valid_bs : (batch_i + 1) * valid_bs] = np.argmax(output.detach().cpu().numpy(), axis=1)
-            y_true[batch_i * valid_bs : (batch_i + 1) * valid_bs] = target.detach().cpu().numpy()
+            target_np = target.detach().cpu().numpy()
+            pred_np = np.argmax(output.detach().cpu().numpy(), axis=1)
+            correct_samples += (target_np == pred_np).sum()
+            total_samples += target_np.shape[0]
+            y_pred.append(pred_np)
+            y_true.append(target_np)
 
             del data, target, output
             torch.cuda.empty_cache()
 
-    valid_loss = np.mean(val_loss)
-    f1_scores = f1_score(y_true, y_pred, average=None)
-    f1_score_macro = f1_score(y_true, y_pred, average='macro')
-    accuracy_score = correct_samples / (len(valid_loader)*valid_bs)
+    y_pred = np.concatenate(y_pred) if y_pred else np.array([], dtype=np.int64)
+    y_true = np.concatenate(y_true) if y_true else np.array([], dtype=np.int64)
+    valid_loss = np.mean(val_loss) if val_loss else np.nan
+    f1_scores = f1_score(y_true, y_pred, average=None) if total_samples > 0 else np.array([])
+    f1_score_macro = f1_score(y_true, y_pred, average='macro') if total_samples > 0 else np.nan
+    accuracy_score = correct_samples / total_samples if total_samples > 0 else np.nan
 
     metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
     return metrics

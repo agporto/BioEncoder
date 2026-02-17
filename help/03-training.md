@@ -7,7 +7,7 @@ BioEncoder relies on _YAML_ files to control the training process. Each _YAML_ f
 - Loss functions
 - etc..
 
-Example config files can be found in the [config-templates](../config-templates) folder. These files provide a starting point for training BioEncoder models and can be modified to suit specific use cases.
+Example config files can be found in the `bioencoder_configs` folder. These files provide a starting point for training BioEncoder models and can be modified to suit specific use cases.
 
 # Training stage 1
 
@@ -23,7 +23,7 @@ Trace progress with tensorboard:
 tensorboard --logdir "bioencoder_wd/runs"
 ```
 
-After training the first stage, we can do model averaging using stochastic weight averaging (SWA) on the top three performing model weights to further enhance the generalization capabilities:
+After training the first stage, we can do model averaging using stochastic weight averaging (SWA) on the latest `top_k_checkpoints` model weights to further enhance the generalization capabilities:
 
 ```python
 bioencoder.swa(config_path=r"bioencoder_configs/swa_stage1.yml")

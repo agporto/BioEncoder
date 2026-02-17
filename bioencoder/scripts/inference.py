@@ -19,6 +19,10 @@ from bioencoder.core import utils
 
 #%% function
 
+VALID_IMAGE_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"
+}
+
 def inference(    
         config_path, 
         image,
@@ -76,10 +80,21 @@ def inference(
     else:    
         ckpt_pretrained = os.path.join(config.root_dir, "weights", run_name, stage, checkpoint)
         
-    ## load from config
-    if root_dir and run_name:
-        train_dir = os.path.join(root_dir,"data",  run_name, "train")
-        labels_sorted = ImageFolder(root=train_dir).classes
+    labels_sorted = None
+    if stage == "second":
+        ## Preferred source of class names from local run data.
+        if root_dir and run_name:
+            train_dir = os.path.join(root_dir, "data", run_name, "train")
+            if os.path.isdir(train_dir):
+                labels_sorted = ImageFolder(root=train_dir).classes
+        ## Fallback to explicit class names from config for custom checkpoints.
+        if labels_sorted is None:
+            labels_sorted = hyperparams["model"].get("class_names", None)
+        if labels_sorted is None:
+            raise ValueError(
+                "Could not resolve class names for second-stage inference. "
+                "Either ensure <root_dir>/data/<run_name>/train exists or provide model.class_names in config."
+            )
         
     ## set random seed
     utils.set_seed()
@@ -118,18 +133,20 @@ def inference(
     image = transform(image=image)["image"]
     image = image.unsqueeze(0).to(device)
 
+    ## stage-specific forward behavior
+    if stage == "first":
+        model.use_projection_head(False)
+
     ## get embeddings / logits
     with torch.no_grad():
         output = model(image)
     
     if stage=="first":
-        model.use_projection_head(False)
         embeddings = output.detach().cpu().numpy().squeeze()  
         embeddings = np.float32(embeddings)
         result = embeddings    
         
     elif stage=="second":
-        model.use_projection_head((stage=='second'))
         probabilities = torch.nn.functional.softmax(output, dim=1)
         probabilities = probabilities.detach().cpu().numpy().squeeze()  
         classes = {class_name: float(prob) for class_name, prob in zip(labels_sorted, np.float32(probabilities))}
@@ -143,8 +160,8 @@ def inference(
 def cli():
         
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path",type=str, help="Path to the YAML configuration file to create interactive plots.")
-    parser.add_argument("--path", type=str, help="Path to image or folder to embedd / classify.")
+    parser.add_argument("--config-path",type=str, required=True, help="Path to the YAML configuration file for inference.")
+    parser.add_argument("--path", type=str, required=True, help="Path to an image file or directory to embed/classify.")
     parser.add_argument("--save-path", type=str, default="bioencoder_results.csv", help="Path to CSV file with results.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite CSV file with results.")
     args = parser.parse_args()
@@ -154,7 +171,14 @@ def cli():
     if os.path.isdir(args.path):
         if os.path.isfile(args.save_path) and not args.overwrite:
             return f"{args.save_path} exists - (use --overwrite)"
-        file_name_list = os.listdir(args.path)
+        file_name_list = sorted(
+            [
+                file_name
+                for file_name in os.listdir(args.path)
+                if os.path.isfile(os.path.join(args.path, file_name))
+                and os.path.splitext(file_name)[1].lower() in VALID_IMAGE_EXTENSIONS
+            ]
+        )
         results_dict = {}
         for file_name in tqdm(file_name_list, desc="Processing files"):
             file_path = os.path.join(args.path, file_name)
