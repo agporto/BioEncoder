@@ -75,6 +75,7 @@ def swa(
     if not amp:
         scaler = None
     utils.set_seed()
+    device = torch.device("cuda:0")
 
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(
@@ -85,7 +86,8 @@ def swa(
         second_stage=(stage == "second"),
         num_classes=num_classes,
         ckpt_pretrained=None,
-    ).cuda()
+        cuda_device=device,
+    ).to(device)
 
     ## inspect available checkpoints (epochN files only)
     epoch_files = [
@@ -110,7 +112,7 @@ def swa(
     
     state_dicts = []
     for path in checkpoints_paths:
-        state_dicts.append(torch.load(path)["model_state_dict"])
+        state_dicts.append(torch.load(path, map_location=device)["model_state_dict"])
 
     average_dict = OrderedDict()
     for k in state_dicts[0].keys():
@@ -120,16 +122,16 @@ def swa(
 
     torch.save({"model_state_dict": average_dict}, os.path.join(weights_dir, "swa"))
     model.load_state_dict(
-        torch.load(os.path.join(weights_dir, "swa"))["model_state_dict"],
+        torch.load(os.path.join(weights_dir, "swa"), map_location=device)["model_state_dict"],
     )
 
     if stage == "first":
         valid_metrics = utils.validation_constructive(
-            loaders["valid_loader"], loaders["train_loader"], model, scaler
+            loaders["valid_loader"], loaders["train_loader"], model, device, scaler
         )
     else:
         valid_metrics = utils.validation_ce(
-            model, None, loaders["valid_loader"], scaler
+            model, None, loaders["valid_loader"], device, scaler
         )
 
     print("swa stage {} validation metrics: {}".format(stage, valid_metrics))

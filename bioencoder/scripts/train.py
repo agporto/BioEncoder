@@ -13,6 +13,7 @@ import sys
 from rich.pretty import pretty_repr
 
 import torch
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from torch_ema import ExponentialMovingAverage
 
@@ -89,6 +90,20 @@ def train(
     aug_sample = aug_config.get("sample_save", False)
     aug_sample_n = aug_config.get("sample_n", 5)
     aug_sample_seed = aug_config.get("sample_seed", 42)
+    dist_config = hyperparams.get("distributed", {})
+    distributed_enabled = kwargs.get("distributed", dist_config.get("enabled", False))
+    distributed_backend = kwargs.get("backend", dist_config.get("backend", "nccl"))
+    find_unused_parameters = dist_config.get("find_unused_parameters", False)
+    sync_bn = dist_config.get("sync_bn", False)
+    grad_accum_steps = dist_config.get("grad_accum_steps", 1)
+    seed = dist_config.get("seed", 42)
+
+    local_rank = kwargs.get("local_rank", None)
+    if local_rank is None:
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+
+    if distributed_enabled:
+        utils.init_distributed(backend=distributed_backend, local_rank=local_rank)
 
     ## manage directories and paths
     data_dir = os.path.join(root_dir, "data", run_name)
@@ -96,9 +111,14 @@ def train(
     run_dir = os.path.join(root_dir, "runs", run_name, stage)
     weights_dir = os.path.join(root_dir, "weights", run_name, stage)
     for directory in [log_dir, run_dir, weights_dir]:
+        if overwrite and distributed_enabled and utils.is_distributed():
+            torch.distributed.barrier()
         if os.path.exists(directory) and overwrite==True:
-            print(f"removing {directory} (overwrite=True)")
-            shutil.rmtree(directory)
+            if (not distributed_enabled) or local_rank == 0:
+                print(f"removing {directory} (overwrite=True)")
+                shutil.rmtree(directory)
+        if overwrite and distributed_enabled and utils.is_distributed():
+            torch.distributed.barrier()
         os.makedirs(directory, exist_ok=True)
         
     ## collect information on data
@@ -131,7 +151,7 @@ def train(
         )
 
     ## set up logging and tensorboard writer
-    writer = SummaryWriter(run_dir)
+    writer = None
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     if (logger.hasHandlers()):
@@ -146,13 +166,14 @@ def train(
     logger.addHandler(stdout_handler)
 
     ## logging: logfile handler
-    if os.path.isfile(log_file_path):
-        os.remove(log_file_path)
-    file_handler = logging.FileHandler(log_file_path)
-    file_handler.setLevel(logging.INFO)
-    file_formatter = logging.Formatter('%(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
+    if (not distributed_enabled) or local_rank == 0:
+        if os.path.isfile(log_file_path):
+            os.remove(log_file_path)
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(logging.INFO)
+        file_formatter = logging.Formatter('%(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
     
     ## manage second stage
     if stage == "second":
@@ -192,15 +213,28 @@ def train(
         scaler = None
         
     ## set seed for entire pipeline
-    utils.set_seed()
+    rank_offset = local_rank if distributed_enabled else 0
+    utils.set_seed(seed, rank_offset=rank_offset)
 
     ## configure GPU before moving model to CUDA
     assert torch.cuda.device_count() > 0, "No GPUs detected on this System (check your CUDA setup) - aborting."
+    if distributed_enabled:
+        device = torch.device(f"cuda:{local_rank}")
+        logger.info(f"DDP initialized (rank={utils.get_rank()}/{utils.get_world_size()}, local_rank={local_rank}, backend={distributed_backend})")
+    else:
+        device = torch.device("cuda:0")
+
     if torch.cuda.device_count() == 1:
         logger.info(f"Found one GPU: {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
     else:
-        logger.info(f"Found {torch.cuda.device_count()} GPUs, but unfortunately multi-GPU use isn't implemented yet.")
-        logger.info(f"Using GPU {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+        if distributed_enabled:
+            logger.info(f"Found {torch.cuda.device_count()} GPUs and using DDP across {utils.get_world_size()} ranks")
+        else:
+            logger.info(f"Found {torch.cuda.device_count()} GPUs, but distributed mode is disabled.")
+            logger.info(f"Using GPU {torch.cuda.get_device_name(0)} (device {torch.cuda.current_device()})")
+
+    if (not distributed_enabled) or utils.is_main_process():
+        writer = SummaryWriter(run_dir)
 
     # create model, loaders, optimizer, etc
     transforms = utils.build_transforms(hyperparams)    
@@ -211,16 +245,28 @@ def train(
         num_workers, 
         second_stage=(stage == "second"), 
         is_supcon=(criterion_params["name"] == "SupCon"),
+        distributed=distributed_enabled,
+        rank=utils.get_rank(),
+        world_size=utils.get_world_size(),
     )
+    train_sampler = loaders["train_loader"].sampler if distributed_enabled else None
+    train_supcon_sampler = loaders.get("train_supcon_loader", None).sampler if distributed_enabled and "train_supcon_loader" in loaders else None
     model = utils.build_model(
         backbone,
         second_stage=(stage == "second"),
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
-    ).cuda()
+        cuda_device=device,
+    ).to(device)
+
+    if distributed_enabled and sync_bn:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
+    if distributed_enabled:
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=find_unused_parameters)
     
     ## save a sample of augmented images
-    if aug_sample:
+    if aug_sample and ((not distributed_enabled) or utils.is_main_process()):
         utils.save_augmented_sample(data_dir, transforms["train_transforms"], aug_sample_n, seed=aug_sample_seed)
         logger.info(f"Saving augmentation samples: {aug_sample_n} per class to data/{run_name}/aug_sample")
 
@@ -251,6 +297,11 @@ def train(
     metric_best = 0
     if not dry_run:
         for epoch in range(n_epochs):
+            if distributed_enabled:
+                if train_sampler is not None:
+                    train_sampler.set_epoch(epoch)
+                if train_supcon_sampler is not None:
+                    train_supcon_sampler.set_epoch(epoch)
             logger.info(utils.pprint_fill_hbar(f"START - Epoch {epoch}"))
             start_training_time = time.time()
             if stage == "first":
@@ -264,6 +315,8 @@ def train(
                     loss_optimizer,
                     scheduler=scheduler,
                     scheduler_step_per_batch=scheduler_step_per_batch,
+                    device=device,
+                    grad_accum_steps=grad_accum_steps,
                 )
             else:
                 train_metrics = utils.train_epoch_ce(
@@ -275,6 +328,8 @@ def train(
                     ema,
                     scheduler=scheduler,
                     scheduler_step_per_batch=scheduler_step_per_batch,
+                    device=device,
+                    grad_accum_steps=grad_accum_steps,
                 )
             end_training_time = time.time()
     
@@ -286,18 +341,19 @@ def train(
     
             if stage == "first":
                 valid_metrics_projection_head = utils.validation_constructive(
-                    loaders["valid_loader"], loaders["train_loader"], model, scaler
+                    loaders["valid_loader"], loaders["train_loader"], model, device, scaler
                 )
                 
                 ## check for GPU parallelization
                 #model_copy = model.module if isinstance(model, torch.nn.DataParallel) else model
                 
                 #model_copy.use_projection_head(False)
-                model.use_projection_head(False)
+                model_ref = model.module if isinstance(model, DDP) else model
+                model_ref.use_projection_head(False)
                 valid_metrics_encoder = utils.validation_constructive(
-                    loaders["valid_loader"], loaders["train_loader"], model, scaler
+                    loaders["valid_loader"], loaders["train_loader"], model, device, scaler
                 )
-                model.use_projection_head(True)
+                model_ref.use_projection_head(True)
                 #model_copy.use_projection_head(True)    parser.add_argument("--dry_run", action='store_true', help="Run without making any changes.")
 
                 
@@ -314,7 +370,7 @@ def train(
                 valid_metrics = valid_metrics_projection_head
             else:
                 valid_metrics = utils.validation_ce(
-                    model, criterion, loaders["valid_loader"], scaler
+                    model, criterion, loaders["valid_loader"], device, scaler
                 )
                 ## epoch summary
                 message =  "Summary epoch {}:\ntrain time {:.2f}\nvalid time {:.2f}\ntrain loss {:.2f}\nvalid acc dict {}".format(
@@ -333,20 +389,21 @@ def train(
                 )
     
             # write train and valid metrics to the logs
-            utils.add_to_tensorboard_logs(
-                writer, train_metrics["loss"], "Loss/train", epoch
-            )
-            for valid_metric in valid_metrics:
-                try:
-                    utils.add_to_tensorboard_logs(
-                        writer,
-                        valid_metrics[valid_metric],
-                        "{}/validation".format(valid_metric),
-                        epoch,
-                    )
-                except AssertionError:
-                    # in case valid metric is a listhyperparams
-                    pass
+            if (not distributed_enabled) or utils.is_main_process():
+                utils.add_to_tensorboard_logs(
+                    writer, train_metrics["loss"], "Loss/train", epoch
+                )
+                for valid_metric in valid_metrics:
+                    try:
+                        utils.add_to_tensorboard_logs(
+                            writer,
+                            valid_metrics[valid_metric],
+                            "{}/validation".format(valid_metric),
+                            epoch,
+                        )
+                    except AssertionError:
+                        # in case valid metric is a listhyperparams
+                        pass
     
             # check if the best value of metric changed. If so -> save the model
             current_metric = valid_metrics[target_metric]
@@ -357,14 +414,16 @@ def train(
                     )
                 )
    
-                torch.save(
-                    {
-                        "epoch": epoch,
-                        "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                    },
-                    os.path.join(weights_dir, f"epoch{epoch}"),
-                )
+                if (not distributed_enabled) or utils.is_main_process():
+                    model_state = model.module.state_dict() if isinstance(model, DDP) else model.state_dict()
+                    torch.save(
+                        {
+                            "epoch": epoch,
+                            "model_state_dict": model_state,
+                            "optimizer_state_dict": optimizer.state_dict(),
+                        },
+                        os.path.join(weights_dir, f"epoch{epoch}"),
+                    )
                 metric_best = current_metric
             else:
                 logger.info(f"Metric {target_metric} did not improve by ≥{min_improvement:.2%} (best: {metric_best:.6f}, current: {current_metric:.6f})")
@@ -381,7 +440,10 @@ def train(
             logger.info(utils.pprint_fill_hbar(f"END - Epoch {epoch}"))
     else:
         logger.info(utils.pprint_fill_hbar("DRY-RUN ONLY - NO TRAINING"))
-    writer.close()
+    if writer is not None:
+        writer.close()
+    if distributed_enabled:
+        utils.teardown_distributed()
     logging.shutdown()
 
 
@@ -391,10 +453,20 @@ def cli():
     parser.add_argument("--config-path",type=str, required=True, help="Path to the YAML configuration file that specifies detailed training and optimizer parameters.")
     parser.add_argument("--dry-run", action='store_true', help="Run without starting the training to inspect config and augmentations.")
     parser.add_argument("--overwrite", action='store_true', help="Overwrite existing files without asking.")
+    parser.add_argument("--distributed", action='store_true', help="Enable Distributed Data Parallel training.")
+    parser.add_argument("--backend", type=str, default="nccl", help="Distributed backend.")
+    parser.add_argument("--local-rank", "--local_rank", dest="local_rank", type=int, default=0, help="Local rank set by torchrun.")
     args = parser.parse_args()
     
     train_cli = utils.restore_config(train)
-    train_cli(args.config_path, overwrite=args.overwrite, dry_run=args.dry_run)
+    train_cli(
+        args.config_path,
+        overwrite=args.overwrite,
+        dry_run=args.dry_run,
+        distributed=args.distributed,
+        backend=args.backend,
+        local_rank=args.local_rank,
+    )
 
 if __name__ == "__main__":
     

@@ -46,3 +46,24 @@ To train stage 2 and do SWA, run the following command:
 bioencoder.train(config_path=r"bioencoder_configs/train_stage2.yml", overwrite=True)
 bioencoder.swa(config_path=r"bioencoder_configs/swa_stage2.yml")
 ```
+
+# Single-node multi-GPU (DDP)
+
+BioEncoder supports single-node multi-GPU training via PyTorch DDP (`torchrun`).
+
+Example with 8 GPUs:
+
+```bash
+torchrun --standalone --nproc_per_node=8 -m bioencoder.scripts.train \
+  --config-path bioencoder_configs/train_stage2.yml \
+  --distributed --backend nccl
+```
+
+You can also enable distributed mode directly in the YAML using:
+
+- `distributed.enabled`
+- `distributed.backend`
+- `distributed.find_unused_parameters`
+- `distributed.sync_bn`
+- `distributed.grad_accum_steps`
+- `distributed.seed`

@@ -11,8 +11,10 @@ from tqdm import tqdm
 from functools import wraps
 
 import torch
+import torch.distributed as dist
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
+from torch.utils.data.distributed import DistributedSampler
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import f1_score #, accuracy_score
 
@@ -23,6 +25,43 @@ from .models import BioEncoderModel
 from .datasets import create_dataset
 from .augmentations import get_transforms
 from bioencoder.vis import helpers
+
+
+def is_distributed():
+    return dist.is_available() and dist.is_initialized()
+
+
+def get_rank():
+    return dist.get_rank() if is_distributed() else 0
+
+
+def get_world_size():
+    return dist.get_world_size() if is_distributed() else 1
+
+
+def is_main_process():
+    return get_rank() == 0
+
+
+def init_distributed(backend="nccl", local_rank=0):
+    if is_distributed():
+        return
+    required_env = ("RANK", "WORLD_SIZE")
+    missing = [key for key in required_env if key not in os.environ]
+    if missing:
+        raise RuntimeError(
+            "Distributed mode requested but missing required environment variables: "
+            f"{missing}. Launch with torchrun."
+        )
+    dist.init_process_group(backend=backend)
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+
+
+def teardown_distributed():
+    if is_distributed():
+        dist.barrier()
+        dist.destroy_process_group()
 
 def save_yaml(dic, yaml_path):
     with open(yaml_path, 'w') as file:
@@ -92,21 +131,24 @@ def update_config(config, config_path=None):
         yaml.dump(config.__dict__, file, default_flow_style=False)
 
 
-def set_seed(seed=42):
+def set_seed(seed=42, rank_offset=0):
     """Set the random seed for the entire pipeline.
 
     Parameters:
     seed (int, optional): The seed value to set for all random number generators. Default is 42.
 
     """
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
+    seed_value = int(seed) + int(rank_offset)
+    random.seed(seed_value)
+    os.environ["PYTHONHASHSEED"] = str(seed_value)
+    np.random.seed(seed_value)
+    torch.manual_seed(seed_value)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)
     torch.backends.cudnn.deterministic = True
     
-    return seed
+    return seed_value
 
 def pprint_fill_hbar(message, symbol="-", ret=True):
     try:
@@ -151,7 +193,8 @@ def add_to_tensorboard_logs(writer, message, tag, index):
     index (int): The global step at which to log the scalar value.
 
     """
-    writer.add_scalar(tag, message, index)
+    if writer is not None:
+        writer.add_scalar(tag, message, index)
 
 
 class TwoCropTransform:
@@ -198,7 +241,9 @@ def build_transforms(config):
 
 def build_loaders(data_dir, transforms, batch_sizes, num_workers, 
                   second_stage=False, is_supcon=False,
-                  shuffle_train=True, drop_last=True):
+                  shuffle_train=True, drop_last=True,
+                  train_sampler=None, valid_sampler=None, train_supcon_sampler=None,
+                  distributed=False, rank=0, world_size=1):
     """
     Build data loaders for training and validation.
     
@@ -229,10 +274,27 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         second_stage=True
     )
 
+    if distributed:
+        train_sampler = DistributedSampler(
+            train_features_dataset,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=shuffle_train,
+            drop_last=drop_last,
+        )
+        valid_sampler = DistributedSampler(
+            valid_dataset,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=False,
+            drop_last=False,
+        )
+
     train_loader = torch.utils.data.DataLoader(
         train_features_dataset, 
         batch_size=batch_sizes['train_batch_size'], 
-        shuffle=shuffle_train,
+        shuffle=shuffle_train if train_sampler is None else False,
+        sampler=train_sampler,
         num_workers=num_workers, 
         pin_memory=True, 
         drop_last=drop_last and batch_sizes['train_batch_size'] is not None
@@ -242,6 +304,7 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         valid_dataset, 
         batch_size=batch_sizes['valid_batch_size'], 
         shuffle=False,
+        sampler=valid_sampler,
         num_workers=num_workers, 
         pin_memory=True, 
         # Keep all validation samples for unbiased validation metrics.
@@ -261,10 +324,20 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
             second_stage=False if is_supcon else True
         )
 
+        if distributed:
+            train_supcon_sampler = DistributedSampler(
+                train_supcon_dataset,
+                num_replicas=world_size,
+                rank=rank,
+                shuffle=True,
+                drop_last=drop_last,
+            )
+
         train_supcon_loader = torch.utils.data.DataLoader(
             train_supcon_dataset, 
             batch_size=batch_sizes['train_batch_size'], 
-            shuffle=True,
+            shuffle=True if train_supcon_sampler is None else False,
+            sampler=train_supcon_sampler,
             num_workers=num_workers, 
             pin_memory=True,
             drop_last=drop_last and batch_sizes['train_batch_size'] is not None
@@ -293,7 +366,8 @@ def build_model(backbone, second_stage=False, num_classes=None, ckpt_pretrained=
     model = BioEncoderModel(backbone=backbone, second_stage=second_stage, num_classes=num_classes)
 
     if ckpt_pretrained:
-        model.load_state_dict(torch.load(ckpt_pretrained, map_location=torch.device(cuda_device))['model_state_dict'], strict=False)
+        map_location = cuda_device if isinstance(cuda_device, torch.device) else torch.device(cuda_device)
+        model.load_state_dict(torch.load(ckpt_pretrained, map_location=map_location)['model_state_dict'], strict=False)
 
     return model
 
@@ -359,7 +433,31 @@ def build_optim(model, optimizer_params, scheduler_params, loss_params):
     return {"criterion": criterion, "optimizer": optimizer, "scheduler": scheduler, "loss_optimizer": loss_optimizer}
 
 
-def compute_embeddings(loader, model, scaler=None):
+def _all_gather_cat(tensor):
+    world_size = get_world_size()
+    if world_size == 1:
+        return tensor
+
+    local_size = torch.tensor([tensor.shape[0]], device=tensor.device, dtype=torch.long)
+    size_list = [torch.zeros_like(local_size) for _ in range(world_size)]
+    dist.all_gather(size_list, local_size)
+    max_size = int(torch.stack(size_list).max().item())
+
+    if tensor.shape[0] < max_size:
+        pad_shape = (max_size - tensor.shape[0],) + tensor.shape[1:]
+        pad = torch.zeros(pad_shape, dtype=tensor.dtype, device=tensor.device)
+        tensor = torch.cat([tensor, pad], dim=0)
+
+    gathered = [torch.zeros_like(tensor) for _ in range(world_size)]
+    dist.all_gather(gathered, tensor)
+
+    outputs = []
+    for idx, chunk in enumerate(gathered):
+        outputs.append(chunk[: int(size_list[idx].item())])
+    return torch.cat(outputs, dim=0)
+
+
+def compute_embeddings(loader, model, device, scaler=None):
     """Computes the embeddings and corresponding labels for a dataset.
 
     Parameters:
@@ -376,7 +474,7 @@ def compute_embeddings(loader, model, scaler=None):
     total_labels = None
 
     for images, labels in loader:
-        images = images.cuda()
+        images = images.to(device, non_blocking=True)
         if scaler:
             with torch.amp.autocast("cuda"):
                 embed = model(images)
@@ -393,7 +491,15 @@ def compute_embeddings(loader, model, scaler=None):
 
     torch.cuda.empty_cache()
 
-    return np.float32(total_embeddings), np.uint8(total_labels)
+    emb = np.float32(total_embeddings)
+    lbl = np.uint8(total_labels)
+    if is_distributed():
+        emb_t = torch.from_numpy(emb).to(device)
+        lbl_t = torch.from_numpy(lbl).to(device)
+        emb = _all_gather_cat(emb_t).detach().cpu().numpy().astype(np.float32)
+        lbl = _all_gather_cat(lbl_t).detach().cpu().numpy().astype(np.uint8)
+
+    return emb, lbl
 
 
 def train_epoch_constructive(
@@ -406,6 +512,8 @@ def train_epoch_constructive(
     loss_optimizer,
     scheduler=None,
     scheduler_step_per_batch=False,
+    device=torch.device("cuda"),
+    grad_accum_steps=1,
 ):
     """
     Trains the `model` on the data from the `train_loader` for one epoch. The loss function is defined by `criterion` and
@@ -426,13 +534,19 @@ def train_epoch_constructive(
     model.train()
     train_loss = []
     loss_optimization = False if loss_optimizer is None else True
+    grad_accum_steps = max(1, int(grad_accum_steps))
+    last_accum = len(train_loader) % grad_accum_steps
+
+    optimizer.zero_grad()
+    if loss_optimization:
+        loss_optimizer.zero_grad()
 
     for idx, (images, labels) in enumerate(train_loader):
         if loss_optimization:
-            images, labels = images.cuda(), labels.cuda()
+            images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
         else:
-            images = torch.cat([images[0]['image'], images[1]['image']], dim=0).cuda()
-            labels = labels.cuda()
+            images = torch.cat([images[0]['image'], images[1]['image']], dim=0).to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
             bsz = labels.shape[0]
 
         if scaler:
@@ -455,33 +569,42 @@ def train_epoch_constructive(
         torch.cuda.empty_cache()
 
         train_loss.append(loss.item())
-
-        optimizer.zero_grad()
-        if loss_optimization:
-            loss_optimizer.zero_grad()
+        step_now = ((idx + 1) % grad_accum_steps == 0) or ((idx + 1) == len(train_loader))
+        accum_denom = grad_accum_steps
+        if ((idx + 1) == len(train_loader)) and (last_accum != 0):
+            accum_denom = last_accum
+        loss_to_backprop = loss / accum_denom
 
         if scaler:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            if loss_optimization:
-                scaler.step(loss_optimizer)
-            scaler.update()
+            scaler.scale(loss_to_backprop).backward()
+            if step_now:
+                scaler.step(optimizer)
+                if loss_optimization:
+                    scaler.step(loss_optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                if loss_optimization:
+                    loss_optimizer.zero_grad()
         else:
-            loss.backward()
-            optimizer.step()
-            if loss_optimization:
-                loss_optimizer.step()
+            loss_to_backprop.backward()
+            if step_now:
+                optimizer.step()
+                if loss_optimization:
+                    loss_optimizer.step()
+                optimizer.zero_grad()
+                if loss_optimization:
+                    loss_optimizer.zero_grad()
 
-        if scheduler_step_per_batch and scheduler is not None:
+        if step_now and scheduler_step_per_batch and scheduler is not None:
             scheduler.step()
 
-        if ema:
+        if ema and step_now:
             ema.update(model.parameters())
 
     return {'loss': np.mean(train_loss)}
 
 
-def validation_constructive(valid_loader, train_loader, model, scaler):
+def validation_constructive(valid_loader, train_loader, model, device, scaler):
     """
     This function performs the validation step of the constructive learning algorithm. 
 
@@ -499,16 +622,24 @@ def validation_constructive(valid_loader, train_loader, model, scaler):
     calculator = AccuracyCalculator(k=1, exclude=["r_precision","mean_average_precision_at_r"])
     model.eval()
 
-    query_embeddings, query_labels = compute_embeddings(valid_loader, model, scaler)
-    reference_embeddings, reference_labels = compute_embeddings(train_loader, model, scaler)
+    query_embeddings, query_labels = compute_embeddings(valid_loader, model, device, scaler)
+    reference_embeddings, reference_labels = compute_embeddings(train_loader, model, device, scaler)
     
 
-    acc_dict = calculator.get_accuracy(
-        query_embeddings,
-        query_labels,
-        reference_embeddings,
-        reference_labels,
-    )
+    if is_main_process():
+        acc_dict = calculator.get_accuracy(
+            query_embeddings,
+            query_labels,
+            reference_embeddings,
+            reference_labels,
+        )
+    else:
+        acc_dict = None
+
+    if is_distributed():
+        obj = [acc_dict]
+        dist.broadcast_object_list(obj, src=0)
+        acc_dict = obj[0]
 
     del query_embeddings, query_labels, reference_embeddings, reference_labels
     torch.cuda.empty_cache()
@@ -525,6 +656,8 @@ def train_epoch_ce(
     ema,
     scheduler=None,
     scheduler_step_per_batch=False,
+    device=torch.device("cuda"),
+    grad_accum_steps=1,
 ):
     """
     Train the model for one epoch using cross-entropy loss.
@@ -543,29 +676,45 @@ def train_epoch_ce(
 
     model.train()
     train_loss = []
+    grad_accum_steps = max(1, int(grad_accum_steps))
+    last_accum = len(train_loader) % grad_accum_steps
+
+    optimizer.zero_grad()
 
     for batch_i, (data, target) in enumerate(train_loader):
-        data, target = data.cuda(), target.cuda()
-        optimizer.zero_grad()
+        data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
+        step_now = ((batch_i + 1) % grad_accum_steps == 0) or ((batch_i + 1) == len(train_loader))
         if scaler:
             with torch.amp.autocast("cuda"):
                 output = model(data)
                 loss = criterion(output, target)
                 train_loss.append(loss.item())
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
+                accum_denom = grad_accum_steps
+                if ((batch_i + 1) == len(train_loader)) and (last_accum != 0):
+                    accum_denom = last_accum
+                loss_to_backprop = loss / accum_denom
+                scaler.scale(loss_to_backprop).backward()
+                if step_now:
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
         else:
             output = model(data)
             loss = criterion(output, target)
             train_loss.append(loss.item())
-            loss.backward()
-            optimizer.step()
+            accum_denom = grad_accum_steps
+            if ((batch_i + 1) == len(train_loader)) and (last_accum != 0):
+                accum_denom = last_accum
+            loss_to_backprop = loss / accum_denom
+            loss_to_backprop.backward()
+            if step_now:
+                optimizer.step()
+                optimizer.zero_grad()
 
-        if scheduler_step_per_batch and scheduler is not None:
+        if step_now and scheduler_step_per_batch and scheduler is not None:
             scheduler.step()
 
-        if ema:
+        if ema and step_now:
             ema.update(model.parameters())
 
         del data, target, output
@@ -574,7 +723,7 @@ def train_epoch_ce(
     return {"loss": np.mean(train_loss)}
 
 
-def validation_ce(model, criterion, valid_loader, scaler):
+def validation_ce(model, criterion, valid_loader, device, scaler):
     model.eval()
     val_loss = []
     y_pred, y_true = [], []
@@ -583,7 +732,7 @@ def validation_ce(model, criterion, valid_loader, scaler):
 
     for batch_i, (data, target) in enumerate(valid_loader):
         with torch.no_grad():
-            data, target = data.cuda(), target.cuda()
+            data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
             if scaler:
                 with torch.amp.autocast("cuda"):
                     output = model(data)
@@ -608,10 +757,27 @@ def validation_ce(model, criterion, valid_loader, scaler):
 
     y_pred = np.concatenate(y_pred) if y_pred else np.array([], dtype=np.int64)
     y_true = np.concatenate(y_true) if y_true else np.array([], dtype=np.int64)
-    valid_loss = np.mean(val_loss) if val_loss else np.nan
-    f1_scores = f1_score(y_true, y_pred, average=None) if total_samples > 0 else np.array([])
-    f1_score_macro = f1_score(y_true, y_pred, average='macro') if total_samples > 0 else np.nan
-    accuracy_score = correct_samples / total_samples if total_samples > 0 else np.nan
+
+    if is_distributed():
+        y_pred_t = torch.from_numpy(y_pred).to(device)
+        y_true_t = torch.from_numpy(y_true).to(device)
+        y_pred = _all_gather_cat(y_pred_t).detach().cpu().numpy()
+        y_true = _all_gather_cat(y_true_t).detach().cpu().numpy()
+
+        stats = torch.tensor(
+            [sum(val_loss), len(val_loss), float(correct_samples), float(total_samples)],
+            device=device,
+            dtype=torch.float64,
+        )
+        dist.all_reduce(stats, op=dist.ReduceOp.SUM)
+        loss_sum, loss_count, correct_samples, total_samples = stats.tolist()
+        valid_loss = (loss_sum / loss_count) if loss_count > 0 else np.nan
+    else:
+        valid_loss = np.mean(val_loss) if val_loss else np.nan
+
+    f1_scores = f1_score(y_true, y_pred, average=None) if len(y_true) > 0 else np.array([])
+    f1_score_macro = f1_score(y_true, y_pred, average='macro') if len(y_true) > 0 else np.nan
+    accuracy_score = (correct_samples / total_samples) if total_samples > 0 else np.nan
 
     metrics = {"loss": valid_loss, "accuracy": accuracy_score, "f1_scores": f1_scores, 'f1_score_macro': f1_score_macro}
     return metrics
@@ -696,5 +862,3 @@ def save_augmented_sample(data_dir, transform, n_samples, seed):
             augmented_image = to_pil_image(postprocessing(augmented_image))
             sample_path = os.path.join(save_dir, f"{class_label_str}_{image_name}_augmented.png")
             augmented_image.save(sample_path)
-
-

@@ -10,6 +10,14 @@ train:
   target_metric: accuracy # Metric to optimize during training
   stage: second # Training stage: 'first' for SupCon, 'second' for fine-tuning classification
 
+distributed:
+  enabled: False # Enable Distributed Data Parallel training with torchrun
+  backend: nccl # Distributed backend for single-node multi-GPU
+  find_unused_parameters: False # Set True only if you have intentionally unused branches
+  sync_bn: False # Convert BatchNorm to SyncBatchNorm across GPUs
+  grad_accum_steps: 1 # Gradient accumulation steps per rank
+  seed: 42 # Random seed used as base for reproducibility
+
 dataloaders:
   train_batch_size: 40 # Batch size for training data
   valid_batch_size: 40 # Batch size for validation data
@@ -50,4 +58,3 @@ augmentations: # augmentations to be applied - see https://github.com/agporto/Bi
     - OpticalDistortion: # Apply optical distortion to the image
     - GridDistortion: # Apply grid distortion to the image
     - HueSaturationValue: # Randomly change hue, saturation, and value of the image
-
