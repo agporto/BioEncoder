@@ -88,7 +88,7 @@ def model_explorer(
 
     # Sidebar    
     img_path = "https://github.com/agporto/BioEncoder/raw/main/assets/bioencoder_logo.png"
-    st.sidebar.image(img_path, width='stretch')
+    st.sidebar.image(img_path, use_container_width=True)
     st.sidebar.title("BioEncoder Model Explorer")
 
     # Image upload
@@ -116,7 +116,7 @@ def model_explorer(
         
         # Display the uploaded image
         image = Image.open(uploaded_file).convert('RGB')
-        st.sidebar.image(image, caption="Input Image", width='stretch')
+        st.sidebar.image(image, caption="Input Image", use_container_width=True)
         
         # resize image
         image_resized = image.resize((img_size, img_size))

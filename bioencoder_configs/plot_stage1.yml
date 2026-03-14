@@ -6,11 +6,12 @@ model:
 dataloaders:
   train_batch_size: 20 # Larger is faster; no value or removing this line will not include training data
   valid_batch_size: 20 # Larger is faster; val data is always plotted
-  num_workers: 32 # Should not exceed available CPU cores
+  num_workers: 4 # Should not exceed available CPU cores
 
-img_size: 384 # image size used for training
+img_size: 256 # image size used for training
 
 perplexity: 30 # for tSNE<; cannot be larger than dataset
+progress_bar: True # Show progress while computing train/val embeddings
 
 plot_style: 2 # (1: pictogram above point, 2: pictogram next to plot panel)
 point_size: 10  ## size of points in scatter plot

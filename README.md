@@ -32,7 +32,10 @@ Read the paper: [https://onlinelibrary.wiley.com/doi/10.1111/ele.14495](https://
 [>> Comprehensive help files <<](help)
 
 1\. Install BioEncoder (into a virtual environment with pytorch/CUDA): 
+
+Install `torch` / `torchvision` first for your platform (CPU or CUDA), then install BioEncoder:
 ````
+pip install torch torchvision
 pip install bioencoder
 ````
 

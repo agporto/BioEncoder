@@ -6,6 +6,7 @@
 import argparse
 import os
 import matplotlib.pyplot as plt
+import torch
 
 from torch_lr_finder import LRFinder
 
@@ -102,12 +103,14 @@ def lr_finder(
         data_dir, transforms, batch_sizes, num_workers, second_stage=True
     )
     
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = utils.build_model(
         backbone,
         second_stage=True,
         num_classes=num_classes,
         ckpt_pretrained=ckpt_pretrained,
-    ).cuda()
+        cuda_device=device,
+    ).to(device)
 
     optim = utils.build_optim(
         model, optimizer_params, scheduler_params, criterion_params
@@ -117,12 +120,13 @@ def lr_finder(
         optim["optimizer"],
         optim["scheduler"],
     )
-    lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
+    lr_finder = LRFinder(model, optimizer, criterion, device=str(device))
     lr_finder.range_test(loaders["train_loader"], end_lr=1, num_iter=num_iter)
 
     fig, ax = plt.subplots()
     ax, lr = lr_finder.plot(ax=ax, skip_start=skip_start, skip_end=skip_end)
     config.lr = round(lr, 6)
+    config.second_lr = config.lr
     fig.suptitle(f"Suggested LR: {config.lr}" , fontsize=20)
 
     if save_figure:
@@ -144,5 +148,3 @@ def cli():
 if __name__ == "__main__":
     
     cli()
-
-

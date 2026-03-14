@@ -191,6 +191,15 @@ class GuidedBackpropReLU(Function):
         return grad_input
 
 
+class GuidedBackpropReLUModule(nn.Module):
+    """
+    nn.Module wrapper for GuidedBackpropReLU autograd function.
+    """
+
+    def forward(self, input_img):
+        return GuidedBackpropReLU.apply(input_img)
+
+
 class GuidedBackpropReLUModel:
     """
     A class that creates a model with GuidedBackpropReLU activation functions instead of standard ReLU activations.
@@ -213,7 +222,7 @@ class GuidedBackpropReLUModel:
             for idx, module in module_top._modules.items():
                 recursive_relu_apply(module)
                 if module.__class__.__name__ == 'ReLU':
-                    module_top._modules[idx] = GuidedBackpropReLU.apply
+                    module_top._modules[idx] = GuidedBackpropReLUModule()
 
         # replace ReLU with GuidedBackpropReLU
         recursive_relu_apply(self.model)

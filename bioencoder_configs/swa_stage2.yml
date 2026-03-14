@@ -10,6 +10,6 @@ train:
 dataloaders:
   train_batch_size: 40 # Batch size for training data
   valid_batch_size: 40 # Batch size for validation data
-  num_workers: 16 # Number of CPU threads for data loading
+  num_workers: 4 # Number of CPU threads for data loading
 
-img_size: 384 # Image size for training and validation
+img_size: 256 # Image size for training and validation

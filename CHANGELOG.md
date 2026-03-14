@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.6
+- FIX: DDP training stability and config handling (single init, rank/world-size propagation, robust setup/token flow)
+- NEW: tqdm progress bars for training/validation and interactive embedding extraction
+- FIX: interactive plots alignment bugs and compute_embeddings device argument handling
+- FIX: Streamlit compatibility updates for model explorer (`use_container_width`, watcher workaround)
+- FIX: safer core behavior (no-grad embedding extraction, CPU fallbacks in train/SWA/LR finder, clearer missing global config error)
+- IMPROVED: metric selection logic with configurable `target_metric_mode` (`auto` / `max` / `min`)
+
 ## 1.0.5
 - FIX: class order in model explorer was broken!
 - FIX: interactive plot was looking for a missing argument 

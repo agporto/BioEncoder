@@ -3,14 +3,16 @@ model:
   num_classes: 4 # Number of output classes for classification
 
 dataloaders:
-  train_batch_size: 50 # Batch size for training data; larger sizes utilize GPU memory better
-  valid_batch_size: 50 # Batch size for validation data
-  num_workers: 32 # Number of CPU threads for data loading; set to the number of CPU cores available
+  train_batch_size: 40 # Batch size for training data; larger sizes utilize GPU memory better
+  valid_batch_size: 40 # Batch size for validation data
+  num_workers: 4 # Number of CPU threads for data loading; set to the number of CPU cores available
 
 optimizer:
   name: SGD # Optimizer type
   params:
     lr: 0.001 # Learning rate
+
+img_size: 256 # Input image size used by the stage-1 model
 
 criterion:
   name: 'CrossEntropy' # Loss function for multi-class classification

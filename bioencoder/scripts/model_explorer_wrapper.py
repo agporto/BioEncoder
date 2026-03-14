@@ -12,8 +12,19 @@ import subprocess
 def model_explorer_wrapper(config_path):
     
     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_explorer.py")
-    process = ["streamlit", "run", script_path , "--", "--config-path", config_path]
-    subprocess.run(process, check=True)
+    process = [
+        "streamlit",
+        "run",
+        script_path,
+        "--server.fileWatcherType",
+        "none",
+        "--",
+        "--config-path",
+        config_path,
+    ]
+    env = os.environ.copy()
+    env.setdefault("STREAMLIT_SERVER_FILE_WATCHER_TYPE", "none")
+    subprocess.run(process, check=True, env=env)
     
 def cli():
 

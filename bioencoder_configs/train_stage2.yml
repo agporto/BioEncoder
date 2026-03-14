@@ -6,19 +6,32 @@ train:
   n_epochs: &epochs 30 # Number of training epochs
   amp: True # Enable Automatic Mixed Precision (AMP) for faster training on compatible GPUs
   ema: True # Use Exponential Moving Average to stabilize training
+  progress_bar: True # Show per-batch tqdm progress during each epoch (rank 0 only in DDP)
   ema_decay_per_epoch: 0.4 # EMA decay rate; adjust based on dataset size
   target_metric: accuracy # Metric to optimize during training
   stage: second # Training stage: 'first' for SupCon, 'second' for fine-tuning classification
 
+distributed:
+  enabled: True # Enable Distributed Data Parallel training with torchrun
+  backend: nccl # Distributed backend for single-node multi-GPU
+  find_unused_parameters: False # Set True only if you have intentionally unused branches
+  sync_bn: False # Convert BatchNorm to SyncBatchNorm across GPUs
+  grad_accum_steps: 1 # Gradient accumulation steps per rank
+  seed: 42 # Random seed used as base for reproducibility
+
 dataloaders:
   train_batch_size: 40 # Batch size for training data
   valid_batch_size: 40 # Batch size for validation data
-  num_workers: 16 # Number of CPU threads for data loading
+  num_workers: 4 # Number of CPU threads for data loading
 
 optimizer:
   name: SGD # Optimizer type - see https://github.com/agporto/BioEncoder/blob/main/help/05-options.md#optimizers
   params:
-    lr: 0.3 # Learning rate
+    lr: 0.003 # Learning rate
+    momentum: 0.9
+    weight_decay: 0.0
+    foreach: False
+    fused: False
 
 scheduler:
   name: CosineAnnealingLR # Learning rate scheduler - see https://github.com/agporto/BioEncoder/blob/main/help/05-options.md#schedulers
@@ -29,25 +42,21 @@ scheduler:
 criterion:
   name: 'LabelSmoothing' # Loss function - see https://github.com/agporto/BioEncoder/blob/main/help/05-options.md#losses
   params:
-    classes: 100 # Number of classes (adjust based on actual number of classes)
+    classes: 4 # Number of classes (adjust based on actual number of classes)
     smoothing: 0.01 # Smoothing factor for label smoothing
 
-img_size: &size 384  # Image size for training and validation
+img_size: &size 256  # Image size for training and validation
 
-augmentations: # augmentations to be applied - see https://github.com/agporto/BioEncoder/blob/main/help/05-options.md#augmentations
-  sample_save: True # Whether to save a sample of augmented images
-  sample_n: 10 # Number of augmented image samples per class to save
-  sample_seed: 42 # Seed for random sample
+augmentations:
+  sample_save: False
+  sample_n: 10
+  sample_seed: 42
   transforms:
-    - RandomResizedCrop: # Randomly resize and crop the image
+    - RandomResizedCrop:
         height: *size
         width: *size
-        scale:  !!python/tuple [0.7,1]
-    - Flip: # Randomly flip the image horizontally
-    - RandomRotate90: # Randomly rotate the image by 90 degrees
-    - MedianBlur: # Apply median blur with a probability
-    - ShiftScaleRotate: # Randomly apply affine transformations
-    - OpticalDistortion: # Apply optical distortion to the image
-    - GridDistortion: # Apply grid distortion to the image
-    - HueSaturationValue: # Randomly change hue, saturation, and value of the image
+        scale: !!python/tuple [0.8, 1.0]
+    - Flip:
+    - ShiftScaleRotate:
+    - HueSaturationValue:
 

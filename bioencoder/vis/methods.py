@@ -69,7 +69,8 @@ def visualize_activations(model, module, img, max_acts = 64, save_path = None, d
     acts = acts[0][0].cpu().detach().numpy()  # Subset the output for the first copy
     
     if acts.shape[0] > max_acts:
-        acts = acts[torch.randperm(acts.shape[0])[:max_acts]]
+        idx = np.random.choice(acts.shape[0], size=max_acts, replace=False)
+        acts = acts[idx]
     
     sqrt = int(acts.shape[0]**0.5)
     fig, axs = plt.subplots(sqrt, sqrt)
