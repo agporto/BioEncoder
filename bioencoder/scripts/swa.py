@@ -71,11 +71,9 @@ def swa(
         os.remove(os.path.join(weights_dir, "swa"))
 
     ## scaler
-    scaler = torch.amp.GradScaler("cuda")
-    if not amp:
-        scaler = None
+    scaler = torch.amp.GradScaler("cuda") if (amp and torch.cuda.is_available()) else None
     utils.set_seed()
-    device = torch.device("cuda:0")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     transforms = utils.build_transforms(hyperparams)
     loaders = utils.build_loaders(

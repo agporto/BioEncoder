@@ -3,3 +3,4 @@ model:
   stage: second # Training stage: 'first' for embeddings, 'second' for classification
   num_classes: 4 # Number of output classes for classification
 
+img_size: 256 # Input image size used by the stage-2 model

@@ -103,7 +103,7 @@ def lr_finder(
         data_dir, transforms, batch_sizes, num_workers, second_stage=True
     )
     
-    device = torch.device("cuda:0")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = utils.build_model(
         backbone,
         second_stage=True,
@@ -126,6 +126,7 @@ def lr_finder(
     fig, ax = plt.subplots()
     ax, lr = lr_finder.plot(ax=ax, skip_start=skip_start, skip_end=skip_end)
     config.lr = round(lr, 6)
+    config.second_lr = config.lr
     fig.suptitle(f"Suggested LR: {config.lr}" , fontsize=20)
 
     if save_figure:

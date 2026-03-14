@@ -8,6 +8,35 @@ from bioencoder.core import utils
 from bioencoder.vis import helpers
 from bioencoder import config
 
+
+def _build_split_embeddings_df(rel_paths, embeddings, dataset_name):
+    """
+    Build metadata + embeddings DataFrame for a split with strict length alignment.
+    """
+    n_meta = len(rel_paths)
+    n_embed = len(embeddings)
+    n = min(n_meta, n_embed)
+    if n == 0:
+        raise ValueError(f"No samples available for split '{dataset_name}' (meta={n_meta}, embeddings={n_embed}).")
+    if n_meta != n_embed:
+        print(
+            f"Warning: split '{dataset_name}' metadata/embedding length mismatch "
+            f"(meta={n_meta}, embeddings={n_embed}); truncating to {n}.",
+            flush=True,
+        )
+
+    rel_paths = rel_paths[:n]
+    embeddings = embeddings[:n]
+    df_meta = pd.DataFrame(
+        {
+            "image_name": [os.path.basename(p) for p in rel_paths],
+            "class_str": [os.path.basename(os.path.dirname(p)) for p in rel_paths],
+            "dataset": dataset_name,
+        }
+    )
+    return pd.concat([df_meta, pd.DataFrame(embeddings)], axis=1)
+
+
 def interactive_plots(    
         config_path, 
         overwrite=False,
@@ -62,6 +91,7 @@ def interactive_plots(
     }
     num_workers = hyperparams.get("dataloaders", {}).get("num_workers", 4)
     perplexity = hyperparams.get("perplexity")
+    progress_bar = hyperparams.get("progress_bar", True)
 
     plot_config = {
         "color_classes": hyperparams.get("color_classes", None),
@@ -84,7 +114,14 @@ def interactive_plots(
     print(f"Checkpoint: using {checkpoint} of {stage} stage")
     ckpt_pretrained = os.path.join(root_dir, "weights", run_name, stage, checkpoint)
     seed = utils.set_seed()
-    model = utils.build_model(backbone, second_stage=(stage == "second"), num_classes=num_classes, ckpt_pretrained=ckpt_pretrained).cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = utils.build_model(
+        backbone,
+        second_stage=(stage == "second"),
+        num_classes=num_classes,
+        ckpt_pretrained=ckpt_pretrained,
+        cuda_device=device,
+    ).to(device)
     model.use_projection_head(False)
     model.eval()
     
@@ -95,28 +132,27 @@ def interactive_plots(
         second_stage=(stage == "second"), drop_last=False, shuffle_train=False)
     
     ## val set (always computed)
-    embeddings_val, labels_val = utils.compute_embeddings(loaders["valid_loader"], model)
-    rel_paths_val = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.imgs]
-    # Build validation DataFrame (meta + embeddings)
-    df_val_meta = pd.DataFrame({
-        "image_name": [os.path.basename(p) for p in rel_paths_val],
-        "class_str": [os.path.basename(os.path.dirname(p)) for p in rel_paths_val],
-        "dataset": "val",
-    })
-    df_embeddings = pd.concat([df_val_meta, pd.DataFrame(embeddings_val)], axis=1)
+    embeddings_val, labels_val = utils.compute_embeddings(
+        loaders["valid_loader"],
+        model,
+        device,
+        progress_bar=progress_bar,
+        progress_desc="Embeddings (val)",
+    )
+    rel_paths_val = [item[0][len(root_dir) + 1:] for item in loaders["valid_loader"].dataset.samples]
+    df_embeddings = _build_split_embeddings_df(rel_paths_val, embeddings_val, "val")
     
     ## train set - skipped if zero batch size
     if batch_sizes["train_batch_size"] is not None:
-        embeddings_train, labels_train = utils.compute_embeddings(loaders["train_loader"], model)
-        rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["train_loader"].dataset.imgs]
-        
-        # Build training DataFrame (meta + embeddings)
-        df_train_meta = pd.DataFrame({
-            "image_name": [os.path.basename(p) for p in rel_paths_train],
-            "class_str": [os.path.basename(os.path.dirname(p)) for p in rel_paths_train],
-            "dataset": "train",
-        })
-        df_train = pd.concat([df_train_meta, pd.DataFrame(embeddings_train)], axis=1)
+        embeddings_train, labels_train = utils.compute_embeddings(
+            loaders["train_loader"],
+            model,
+            device,
+            progress_bar=progress_bar,
+            progress_desc="Embeddings (train)",
+        )
+        rel_paths_train = [item[0][len(root_dir) + 1:] for item in loaders["train_loader"].dataset.samples]
+        df_train = _build_split_embeddings_df(rel_paths_train, embeddings_train, "train")
         df_embeddings = pd.concat([df_embeddings, df_train], ignore_index=True)
 
     ## Stable order before reduction

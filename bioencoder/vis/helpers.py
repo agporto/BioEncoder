@@ -150,8 +150,9 @@ def gen_coords(i, patch_size, stride, dim1, dim2):
     tuple
         Tuple containing the (x0, y0, x1, y1) coordinates of the patch.
     """
-    x0 = int(stride * (i % dim1))
-    y0 = int(stride * int(i / dim2))
+    # dim1 is number of rows (y), dim2 is number of columns (x).
+    x0 = int(stride * (i % dim2))
+    y0 = int(stride * (i // dim2))
     x1 = x0 + patch_size
     y1 = y0 + patch_size
 
@@ -285,8 +286,13 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, pl
     
     if not all(col in df.columns for col in ['paths', 'class']):
         raise ValueError("The dataframe must have columns 'paths' and 'class'")      
-   
-    unique_classes = df['class'].unique()
+    df = df.copy()
+    if "class_str" not in df.columns:
+        df["class_str"] = df["class"].astype(str)
+    if "dataset" not in df.columns:
+        df["dataset"] = "dataset"
+
+    unique_classes = df['class_str'].unique()
     unique_datasets = df['dataset'].astype(str).unique()
     markers = ['circle', 'square']  # Define markers for each group
 
@@ -303,7 +309,8 @@ def bokeh_plot(df, out_path='plot.html', color_map="jet", color_classes=None, pl
     else:
         num_classes = len(unique_classes)
         cmap = plt.cm.get_cmap(color_map, num_classes)
-        colors_raw = cmap(df['class'], bytes=True)
+        class_ids, _ = pd.factorize(df['class_str'])
+        colors_raw = cmap(class_ids, bytes=True)
         colors_str = ['#%02x%02x%02x' % tuple(c[:3]) for c in colors_raw]
         df['color'] = colors_str
         

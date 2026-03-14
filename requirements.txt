@@ -8,6 +8,7 @@ pandas
 pytorch-metric-learning==2.0.1
 rich
 scikit-learn
+streamlit
 streamlit-option-menu
 tensorboard
 timm

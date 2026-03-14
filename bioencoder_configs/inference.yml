@@ -5,6 +5,6 @@ model:
   stage: second # Training stage: 'first' for embeddings, 'second' for classification
   num_classes: 4 # Number of output classes for classification
 
-img_size: 384 # Image size for training and validation
+img_size: 256 # Image size for training and validation
 
-return_probs: false # Whether to return the probabilities for each class
+return_probs: true # Whether to return the probabilities for each class

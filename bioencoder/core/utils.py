@@ -42,25 +42,16 @@ def get_world_size():
 def is_main_process():
     return get_rank() == 0
 
+def init_distributed(backend="nccl", local_rank=None):
+    if local_rank is None:
+        local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group(backend=backend, init_method="env://")
 
-def init_distributed(backend="nccl", local_rank=0):
-    if is_distributed():
-        return
-    required_env = ("RANK", "WORLD_SIZE")
-    missing = [key for key in required_env if key not in os.environ]
-    if missing:
-        raise RuntimeError(
-            "Distributed mode requested but missing required environment variables: "
-            f"{missing}. Launch with torchrun."
-        )
-    dist.init_process_group(backend=backend)
-    if torch.cuda.is_available():
-        torch.cuda.set_device(local_rank)
 
 
 def teardown_distributed():
     if is_distributed():
-        dist.barrier()
         dist.destroy_process_group()
 
 def save_yaml(dic, yaml_path):
@@ -95,6 +86,11 @@ def restore_config(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         config_path = os.path.expanduser("~/.bioencoder.yaml")  # Updated to load from YAML
+        if not os.path.isfile(config_path):
+            raise FileNotFoundError(
+                f"Global BioEncoder config not found at '{config_path}'. "
+                "Run the configure CLI first (e.g., bioencoder_configure --root-dir <path> --run-name <name>)."
+            )
         config = load_yaml(config_path)
 
         # Import the bioencoder config module and update its attributes
@@ -113,10 +109,11 @@ def load_model(
         stage,
         cuda_device
         ):
+    device = cuda_device if isinstance(cuda_device, torch.device) else torch.device(cuda_device)
     model = build_model(
         backbone, second_stage=(stage == 'second'), 
         num_classes=num_classes, ckpt_pretrained=ckpt_pretrained, 
-        cuda_device=cuda_device).cuda(cuda_device)
+        cuda_device=device).to(device)
     model.use_projection_head((stage=='second'))
     model.eval()
     
@@ -296,8 +293,10 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         shuffle=shuffle_train if train_sampler is None else False,
         sampler=train_sampler,
         num_workers=num_workers, 
-        pin_memory=True, 
-        drop_last=drop_last and batch_sizes['train_batch_size'] is not None
+        pin_memory=torch.cuda.is_available(),
+        drop_last=drop_last and batch_sizes['train_batch_size'] is not None,
+        multiprocessing_context="spawn" if num_workers > 0 else None,
+        persistent_workers=(num_workers > 0),
     )
 
     valid_loader = torch.utils.data.DataLoader(
@@ -306,9 +305,11 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
         shuffle=False,
         sampler=valid_sampler,
         num_workers=num_workers, 
-        pin_memory=True, 
+        pin_memory=torch.cuda.is_available(),
         # Keep all validation samples for unbiased validation metrics.
-        drop_last=False
+        drop_last=False,
+        multiprocessing_context="spawn" if num_workers > 0 else None,
+        persistent_workers=(num_workers > 0),
     )
     
     loaders = {
@@ -339,8 +340,10 @@ def build_loaders(data_dir, transforms, batch_sizes, num_workers,
             shuffle=True if train_supcon_sampler is None else False,
             sampler=train_supcon_sampler,
             num_workers=num_workers, 
-            pin_memory=True,
-            drop_last=drop_last and batch_sizes['train_batch_size'] is not None
+            pin_memory=torch.cuda.is_available(),
+            drop_last=drop_last and batch_sizes['train_batch_size'] is not None,
+            multiprocessing_context="spawn" if num_workers > 0 else None,
+            persistent_workers=(num_workers > 0),
         )
 
         loaders['train_supcon_loader'] = train_supcon_loader
@@ -457,7 +460,7 @@ def _all_gather_cat(tensor):
     return torch.cat(outputs, dim=0)
 
 
-def compute_embeddings(loader, model, device, scaler=None):
+def compute_embeddings(loader, model, device, scaler=None, progress_bar=False, progress_desc=None):
     """Computes the embeddings and corresponding labels for a dataset.
 
     Parameters:
@@ -473,23 +476,35 @@ def compute_embeddings(loader, model, device, scaler=None):
     total_embeddings = None
     total_labels = None
 
-    for images, labels in loader:
-        images = images.to(device, non_blocking=True)
-        if scaler:
-            with torch.amp.autocast("cuda"):
-                embed = model(images)
-        else:
-            embed = model(images)
-        if total_embeddings is None:
-            total_embeddings = embed.detach().cpu()
-            total_labels = labels.detach().cpu()
-        else:
-            total_embeddings = torch.cat((total_embeddings, embed.detach().cpu()))
-            total_labels = torch.cat((total_labels, labels.detach().cpu()))
+    pbar = None
+    if progress_bar and is_main_process():
+        pbar = tqdm(total=len(loader), desc=progress_desc or "Validation", dynamic_ncols=True, leave=False)
 
-        del images, labels, embed
+    try:
+        for images, labels in loader:
+            with torch.no_grad():
+                images = images.to(device, non_blocking=True)
+                if scaler:
+                    with torch.amp.autocast("cuda"):
+                        embed = model(images)
+                else:
+                    embed = model(images)
+            if total_embeddings is None:
+                total_embeddings = embed.detach().cpu()
+                total_labels = labels.detach().cpu()
+            else:
+                total_embeddings = torch.cat((total_embeddings, embed.detach().cpu()))
+                total_labels = torch.cat((total_labels, labels.detach().cpu()))
 
-    torch.cuda.empty_cache()
+            if pbar is not None:
+                pbar.update(1)
+
+            del images, labels, embed
+    finally:
+        if pbar is not None:
+            pbar.close()
+
+    #torch.cuda.empty_cache()
 
     emb = np.float32(total_embeddings)
     lbl = np.uint8(total_labels)
@@ -500,8 +515,6 @@ def compute_embeddings(loader, model, device, scaler=None):
         lbl = _all_gather_cat(lbl_t).detach().cpu().numpy().astype(np.uint8)
 
     return emb, lbl
-
-
 def train_epoch_constructive(
     train_loader,
     model,
@@ -514,97 +527,114 @@ def train_epoch_constructive(
     scheduler_step_per_batch=False,
     device=torch.device("cuda"),
     grad_accum_steps=1,
+    progress_bar=False,
+    epoch=None,
 ):
-    """
-    Trains the `model` on the data from the `train_loader` for one epoch. The loss function is defined by `criterion` and
-    the optimization algorithm is defined by `optimizer`. The training process can also be scaled using the `scaler` and
-    the `ema` (exponential moving average) can be applied to the model's parameters.
-
-    Parameters:
-    - train_loader (torch.utils.data.DataLoader): The data loader that provides the training data.
-    - model (torch.nn.Module): The model that will be trained.
-    - criterion (torch.nn.Module): The loss function to be used for training.
-    - optimizer (torch.optim.Optimizer): The optimization algorithm to be used for training.
-    - scaler (torch.amp.GradScaler, optional): The scaler used for gradient scaling in case of mixed precision training.
-    - ema (ExponentialMovingAverage, optional): If provided, the exponential moving average to be applied to the model's parameters.
-
-    Returns:
-    - dict: A dictionary containing the mean loss over all training batches.
-    """
     model.train()
     train_loss = []
-    loss_optimization = False if loss_optimizer is None else True
+    loss_optimization = loss_optimizer is not None
     grad_accum_steps = max(1, int(grad_accum_steps))
     last_accum = len(train_loader) % grad_accum_steps
 
-    optimizer.zero_grad()
+    optimizer.zero_grad(set_to_none=True)
     if loss_optimization:
-        loss_optimizer.zero_grad()
+        loss_optimizer.zero_grad(set_to_none=True)
 
-    for idx, (images, labels) in enumerate(train_loader):
-        if loss_optimization:
-            images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
-        else:
-            images = torch.cat([images[0]['image'], images[1]['image']], dim=0).to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
-            bsz = labels.shape[0]
+    pbar = None
+    if progress_bar and is_main_process():
+        epoch_str = f"{epoch + 1}" if epoch is not None else "?"
+        pbar = tqdm(total=len(train_loader), desc=f"Train Epoch {epoch_str}", dynamic_ncols=True, leave=False)
 
-        if scaler:
-            with torch.amp.autocast("cuda"):
+    try:
+        for idx, (images, labels) in enumerate(train_loader):
+            if loss_optimization:
+                images = images.to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
+            else:
+                images = torch.cat([images[0]["image"], images[1]["image"]], dim=0).to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
+                bsz = labels.shape[0]
+
+            if scaler is not None:
+                with torch.amp.autocast("cuda"):
+                    embed = model(images)
+                    if not loss_optimization:
+                        f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
+                        embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+                    loss = criterion(embed, labels)
+            else:
                 embed = model(images)
                 if not loss_optimization:
                     f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
                     embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
                 loss = criterion(embed, labels)
 
-        else:
-            embed = model(images)
-            if not loss_optimization:
-                f1, f2 = torch.split(embed, [bsz, bsz], dim=0)
-                embed = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
-            loss = criterion(embed, labels)
+            train_loss.append(loss.item())
 
+            step_now = ((idx + 1) % grad_accum_steps == 0) or ((idx + 1) == len(train_loader))
+            accum_denom = grad_accum_steps
+            if ((idx + 1) == len(train_loader)) and (last_accum != 0):
+                accum_denom = last_accum
 
-        del images, labels, embed
-        torch.cuda.empty_cache()
+            loss_to_backprop = loss / accum_denom
 
-        train_loss.append(loss.item())
-        step_now = ((idx + 1) % grad_accum_steps == 0) or ((idx + 1) == len(train_loader))
-        accum_denom = grad_accum_steps
-        if ((idx + 1) == len(train_loader)) and (last_accum != 0):
-            accum_denom = last_accum
-        loss_to_backprop = loss / accum_denom
+            if scaler is not None:
+                scaler.scale(loss_to_backprop).backward()
+            else:
+                loss_to_backprop.backward()
 
-        if scaler:
-            scaler.scale(loss_to_backprop).backward()
             if step_now:
-                scaler.step(optimizer)
+                if scaler is not None:
+                    scaler.unscale_(optimizer)
+
+                    if loss_optimization:
+                        scaler.unscale_(loss_optimizer)
+
+                    scaler.step(optimizer)
+
+                    if loss_optimization:
+                        scaler.step(loss_optimizer)
+
+                    scaler.update()
+                else:
+                    optimizer.step()
+
+                    if loss_optimization:
+                        loss_optimizer.step()
+
+                optimizer.zero_grad(set_to_none=True)
+
                 if loss_optimization:
-                    scaler.step(loss_optimizer)
-                scaler.update()
-                optimizer.zero_grad()
-                if loss_optimization:
-                    loss_optimizer.zero_grad()
-        else:
-            loss_to_backprop.backward()
-            if step_now:
-                optimizer.step()
-                if loss_optimization:
-                    loss_optimizer.step()
-                optimizer.zero_grad()
-                if loss_optimization:
-                    loss_optimizer.zero_grad()
+                    loss_optimizer.zero_grad(set_to_none=True)
 
-        if step_now and scheduler_step_per_batch and scheduler is not None:
-            scheduler.step()
+            if step_now and scheduler_step_per_batch and scheduler is not None:
+                scheduler.step()
 
-        if ema and step_now:
-            ema.update(model.parameters())
+            if ema and step_now:
+                ema.update(model.parameters())
 
-    return {'loss': np.mean(train_loss)}
+            if pbar is not None:
+                pbar.update(1)
+                if step_now:
+                    pbar.set_postfix(loss=f"{np.mean(train_loss):.4f}")
 
+            del images, labels, embed, loss, loss_to_backprop
+    finally:
+        if pbar is not None:
+            pbar.close()
 
-def validation_constructive(valid_loader, train_loader, model, device, scaler):
+    return {"loss": np.mean(train_loss)}
+
+def validation_constructive(
+    valid_loader,
+    train_loader,
+    model,
+    device,
+    scaler,
+    progress_bar=False,
+    epoch=None,
+    split_name="projection",
+):
     """
     This function performs the validation step of the constructive learning algorithm. 
 
@@ -622,8 +652,23 @@ def validation_constructive(valid_loader, train_loader, model, device, scaler):
     calculator = AccuracyCalculator(k=1, exclude=["r_precision","mean_average_precision_at_r"])
     model.eval()
 
-    query_embeddings, query_labels = compute_embeddings(valid_loader, model, device, scaler)
-    reference_embeddings, reference_labels = compute_embeddings(train_loader, model, device, scaler)
+    epoch_str = f"{epoch + 1}" if epoch is not None else "?"
+    query_embeddings, query_labels = compute_embeddings(
+        valid_loader,
+        model,
+        device,
+        scaler,
+        progress_bar=progress_bar,
+        progress_desc=f"Valid E{epoch_str} ({split_name}) query",
+    )
+    reference_embeddings, reference_labels = compute_embeddings(
+        train_loader,
+        model,
+        device,
+        scaler,
+        progress_bar=progress_bar,
+        progress_desc=f"Valid E{epoch_str} ({split_name}) ref",
+    )
     
 
     if is_main_process():
@@ -642,7 +687,7 @@ def validation_constructive(valid_loader, train_loader, model, device, scaler):
         acc_dict = obj[0]
 
     del query_embeddings, query_labels, reference_embeddings, reference_labels
-    torch.cuda.empty_cache()
+    #torch.cuda.empty_cache()
 
     return acc_dict
 
@@ -658,6 +703,8 @@ def train_epoch_ce(
     scheduler_step_per_batch=False,
     device=torch.device("cuda"),
     grad_accum_steps=1,
+    progress_bar=False,
+    epoch=None,
 ):
     """
     Train the model for one epoch using cross-entropy loss.
@@ -681,11 +728,30 @@ def train_epoch_ce(
 
     optimizer.zero_grad()
 
-    for batch_i, (data, target) in enumerate(train_loader):
-        data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
-        step_now = ((batch_i + 1) % grad_accum_steps == 0) or ((batch_i + 1) == len(train_loader))
-        if scaler:
-            with torch.amp.autocast("cuda"):
+    pbar = None
+    if progress_bar and is_main_process():
+        epoch_str = f"{epoch + 1}" if epoch is not None else "?"
+        pbar = tqdm(total=len(train_loader), desc=f"Train Epoch {epoch_str}", dynamic_ncols=True, leave=False)
+
+    try:
+        for batch_i, (data, target) in enumerate(train_loader):
+            data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
+            step_now = ((batch_i + 1) % grad_accum_steps == 0) or ((batch_i + 1) == len(train_loader))
+            if scaler:
+                with torch.amp.autocast("cuda"):
+                    output = model(data)
+                    loss = criterion(output, target)
+                    train_loss.append(loss.item())
+                    accum_denom = grad_accum_steps
+                    if ((batch_i + 1) == len(train_loader)) and (last_accum != 0):
+                        accum_denom = last_accum
+                    loss_to_backprop = loss / accum_denom
+                    scaler.scale(loss_to_backprop).backward()
+                    if step_now:
+                        scaler.step(optimizer)
+                        scaler.update()
+                        optimizer.zero_grad()
+            else:
                 output = model(data)
                 loss = criterion(output, target)
                 train_loss.append(loss.item())
@@ -693,67 +759,76 @@ def train_epoch_ce(
                 if ((batch_i + 1) == len(train_loader)) and (last_accum != 0):
                     accum_denom = last_accum
                 loss_to_backprop = loss / accum_denom
-                scaler.scale(loss_to_backprop).backward()
+                loss_to_backprop.backward()
                 if step_now:
-                    scaler.step(optimizer)
-                    scaler.update()
+                    optimizer.step()
                     optimizer.zero_grad()
-        else:
-            output = model(data)
-            loss = criterion(output, target)
-            train_loss.append(loss.item())
-            accum_denom = grad_accum_steps
-            if ((batch_i + 1) == len(train_loader)) and (last_accum != 0):
-                accum_denom = last_accum
-            loss_to_backprop = loss / accum_denom
-            loss_to_backprop.backward()
-            if step_now:
-                optimizer.step()
-                optimizer.zero_grad()
 
-        if step_now and scheduler_step_per_batch and scheduler is not None:
-            scheduler.step()
+            if step_now and scheduler_step_per_batch and scheduler is not None:
+                scheduler.step()
 
-        if ema and step_now:
-            ema.update(model.parameters())
+            if ema and step_now:
+                ema.update(model.parameters())
 
-        del data, target, output
-        torch.cuda.empty_cache()
+            if pbar is not None:
+                pbar.update(1)
+                if step_now:
+                    pbar.set_postfix(loss=f"{np.mean(train_loss):.4f}")
+
+            del data, target, output
+            #torch.cuda.empty_cache()
+    finally:
+        if pbar is not None:
+            pbar.close()
 
     return {"loss": np.mean(train_loss)}
 
 
-def validation_ce(model, criterion, valid_loader, device, scaler):
+def validation_ce(model, criterion, valid_loader, device, scaler, progress_bar=False, epoch=None):
     model.eval()
     val_loss = []
     y_pred, y_true = [], []
     correct_samples = 0
     total_samples = 0
 
-    for batch_i, (data, target) in enumerate(valid_loader):
-        with torch.no_grad():
-            data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
-            if scaler:
-                with torch.amp.autocast("cuda"):
+    pbar = None
+    if progress_bar and is_main_process():
+        epoch_str = f"{epoch + 1}" if epoch is not None else "?"
+        pbar = tqdm(total=len(valid_loader), desc=f"Valid Epoch {epoch_str}", dynamic_ncols=True, leave=False)
+
+    try:
+        for batch_i, (data, target) in enumerate(valid_loader):
+            with torch.no_grad():
+                data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
+                if scaler:
+                    with torch.amp.autocast("cuda"):
+                        output = model(data)
+                        if criterion:
+                            loss = criterion(output, target)
+                            val_loss.append(loss.item())
+                else:
                     output = model(data)
                     if criterion:
                         loss = criterion(output, target)
                         val_loss.append(loss.item())
-            else:
-                output = model(data)
-                if criterion:
-                    loss = criterion(output, target)
-                    val_loss.append(loss.item())
 
-            target_np = target.detach().cpu().numpy()
-            pred_np = np.argmax(output.detach().cpu().numpy(), axis=1)
-            correct_samples += (target_np == pred_np).sum()
-            total_samples += target_np.shape[0]
-            y_pred.append(pred_np)
-            y_true.append(target_np)
+                target_np = target.detach().cpu().numpy()
+                pred_np = np.argmax(output.detach().cpu().numpy(), axis=1)
+                correct_samples += (target_np == pred_np).sum()
+                total_samples += target_np.shape[0]
+                y_pred.append(pred_np)
+                y_true.append(target_np)
 
-            del data, target, output
-            torch.cuda.empty_cache()
+                if pbar is not None:
+                    pbar.update(1)
+                    if len(val_loss) > 0:
+                        pbar.set_postfix(loss=f"{np.mean(val_loss):.4f}")
+
+                del data, target, output
+                #torch.cuda.empty_cache()
+    finally:
+        if pbar is not None:
+            pbar.close()
 
     y_pred = np.concatenate(y_pred) if y_pred else np.array([], dtype=np.int64)
     y_true = np.concatenate(y_true) if y_true else np.array([], dtype=np.int64)

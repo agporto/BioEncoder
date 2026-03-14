@@ -1,3 +1,5 @@
 model:
   backbone: timm_tf_efficientnet_b5.ns_jft_in1k # Model architecture and pre-trained weights to use
   stage: first # Training stage: 'first' for embeddings, 'second' for classification
+
+img_size: 256 # Input image size used by the stage-1 model
